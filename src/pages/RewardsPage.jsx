@@ -3,9 +3,22 @@ import { motion } from "framer-motion";
 import { Gift, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+/**
+ * POINT SYSTEM STORAGE KEYS
+ */
+const POINTS_KEY = "spin_rewards_points";
+const STREAK_KEY = "daily_login_streak";
+const LAST_LOGIN_KEY = "last_login_date";
+const ORDER_COUNT_KEY = "order_count";
+const REFERRAL_COUNT_KEY = "referral_count";
+
 export default function RewardsPage() {
   const navigate = useNavigate();
-  const [totalPoints, setTotalPoints] = useState(120);
+
+  const [totalPoints, setTotalPoints] = useState(0);
+  const [orderCount, setOrderCount] = useState(0);
+  const [referrals, setReferrals] = useState(0);
+  const [streak, setStreak] = useState(0);
 
   const rules = [
     "💰 Earn 1 point for every ₹10 you spend on your orders.",
@@ -17,20 +30,68 @@ export default function RewardsPage() {
     "🎡 Try your luck with Spin & Win for surprise bonus rewards every day!",
   ];
 
+  // Load points & stats from storage
   useEffect(() => {
-    const points = parseInt(localStorage.getItem("SpinAndWin_totalPoints") || "120", 10);
-    setTotalPoints(points);
+    const pts = parseInt(localStorage.getItem(POINTS_KEY) || "0");
+    const oc = parseInt(localStorage.getItem(ORDER_COUNT_KEY) || "0");
+    const rc = parseInt(localStorage.getItem(REFERRAL_COUNT_KEY) || "0");
+    const st = parseInt(localStorage.getItem(STREAK_KEY) || "0");
+
+    setTotalPoints(pts);
+    setOrderCount(oc);
+    setReferrals(rc);
+    setStreak(st);
+
+    handleDailyLoginLogic();
   }, []);
 
+  /**
+   * DAILY LOGIN LOGIC
+   */
+  const handleDailyLoginLogic = () => {
+    const today = new Date().toLocaleDateString();
+    const lastLogin = localStorage.getItem(LAST_LOGIN_KEY);
+
+    if (lastLogin === today) return; // Already logged in today
+
+    // new login → +1 streak point + streak increment
+    let newStreak = streak + 1;
+    localStorage.setItem(STREAK_KEY, newStreak);
+    localStorage.setItem(LAST_LOGIN_KEY, today);
+
+    addPoints(1);
+  };
+
+  /**
+   * ADD POINTS LOGIC (shared by all activities)
+   */
+const addPoints = (value) => {
+  const updated = Math.max(0, totalPoints + value);
+  setTotalPoints(updated);
+  localStorage.setItem(POINTS_KEY, updated);
+};
+
+  /**
+   * REDEEM (go to home & deduct)
+   */
+  const handleRedeem = () => {
+  // No deduction
+  navigate("/home");
+};
+
+
+  /**
+   * NAVIGATION ACTIONS
+   */
   const handleSpin = () => navigate("/spinandwin");
   const handleRefer = () => navigate("/referafriend");
   const handleDailyLogin = () => navigate("/dailylogin");
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white flex flex-col relative items-center">
+
       {/* Header */}
       <header className="bg-orange-500 text-white py-4 px-7 shadow-lg w-full relative flex items-center justify-center">
-        {/* Back Button */}
         <button
           onClick={() => navigate(-1)}
           className="absolute left-5 top-3 p-2 rounded-full bg-white shadow hover:bg-gray-100 transition"
@@ -38,17 +99,9 @@ export default function RewardsPage() {
           <ArrowLeft className="w-5 h-5 text-orange-500" />
         </button>
 
-        {/* Title */}
         <h1 className="text-xl font-bold text-center">Rewards & Points</h1>
 
-        {/* Gift Outline Icon (white, empty) */}
-        <Gift
-          className="absolute right-5 top-3"
-          size={24}
-          strokeWidth={2}
-          color="white"
-          fill="none"
-        />
+        <Gift className="absolute right-5 top-3" size={24} color="white" strokeWidth={2} />
       </header>
 
       <motion.div
@@ -57,6 +110,7 @@ export default function RewardsPage() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6 }}
       >
+        {/* Title */}
         <div className="text-center">
           <motion.h2
             className="text-2xl font-semibold text-orange-600 mb-3"
@@ -70,21 +124,22 @@ export default function RewardsPage() {
             You can earn reward points through various activities on Zatpatt!
           </p>
 
-          {/* Reward Points Card */}
+          {/* Rewards Card */}
           <div className="mx-auto mt-5 bg-gradient-to-r from-orange-400 to-amber-400 text-white p-5 rounded-2xl shadow-md flex justify-between items-center w-full sm:w-[90%]">
             <div>
               <h3 className="text-sm opacity-90">Your Reward Points</h3>
               <p className="text-3xl font-bold">{totalPoints}</p>
             </div>
+
             <button
-              onClick={() => alert("Redeem feature coming soon!")}
-              className="bg-white text-orange-600 text-sm font-semibold px-3 py-2 rounded-xl shadow hover:bg-orange-50 transition"
+              onClick={handleRedeem}
+              className="bg-white text-orange-600 text-sm font-semibold px-3 py-2 rounded-xl shadow hover:bg-orange-50"
             >
               Redeem
             </button>
           </div>
 
-          {/* Rules Card */}
+          {/* Rules */}
           <div className="mt-10 text-left">
             <motion.div
               className="w-full p-[2px] rounded-xl bg-gradient-to-r from-orange-500 via-orange-400 to-yellow-400 shadow-lg"
@@ -107,32 +162,32 @@ export default function RewardsPage() {
             </motion.div>
           </div>
 
-          {/* Action Buttons */}
-<div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
-  <motion.button
-    whileTap={{ scale: 0.95 }}
-    onClick={handleSpin}
-    className="bg-orange-500 text-white px-4 py-2 rounded-full shadow-md hover:bg-orange-600 transition text-sm w-full"
-  >
-    🎡 Spin & Win
-  </motion.button>
+          {/* Buttons */}
+          <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={handleSpin}
+              className="bg-orange-500 text-white px-4 py-2 rounded-full shadow-md hover:bg-orange-600 transition text-sm w-full"
+            >
+              🎡 Spin & Win
+            </motion.button>
 
-  <motion.button
-    whileTap={{ scale: 0.95 }}
-    onClick={handleRefer}
-    className="bg-orange-500 text-white px-4 py-2 rounded-full shadow-md hover:bg-orange-600 transition text-sm w-full"
-  >
-    🎯 Refer a Friend & Earn
-  </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={handleRefer}
+              className="bg-orange-500 text-white px-4 py-2 rounded-full shadow-md hover:bg-orange-600 transition text-sm w-full"
+            >
+              🎯 Refer & Earn
+            </motion.button>
 
-  <motion.button
-    whileTap={{ scale: 0.95 }}
-    onClick={handleDailyLogin}
-    className="bg-orange-500 text-white px-4 py-2 rounded-full shadow-md hover:bg-orange-600 transition text-sm w-full"
-  >
-    📅 Daily Login
-  </motion.button>
-</div>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={handleDailyLogin}
+              className="bg-orange-500 text-white px-4 py-2 rounded-full shadow-md hover:bg-orange-600 transition text-sm w-full"
+            >
+              📅 Daily Login
+            </motion.button>
+          </div>
         </div>
       </motion.div>
     </div>

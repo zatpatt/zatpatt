@@ -7,23 +7,54 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function CartPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  
 
   const [cartItems, setCartItems] = useState(() => {
     const stored = localStorage.getItem("cartItems");
     return stored
       ? JSON.parse(stored)
       : [
-          {
-            id: 1,
-            name: "Hyderabadi Biryani Vasind",
-            price: 220,
-            quantity: 1,
-            img: "https://via.placeholder.com/80",
-          },
+  
         ];
   });
+  
+  // ✅ RULE: if Lamination or Binding is in cart, printing must also exist to checkout
+const hasPrint = cartItems.some(item => item.category === "print");
+const hasLaminationOrBinding = cartItems.some(
+  item => item.category === "lamination" || item.category === "binding"
+);
+const canCheckout = !hasLaminationOrBinding || hasPrint;
+ 
+const [savedItems, setSavedItems] = useState(() => {
+  const stored = localStorage.getItem("savedForLater");
+  return stored ? JSON.parse(stored) : [];
+});
 
-  const [savedItems, setSavedItems] = useState([]);
+const [deliveryCharge, setDeliveryCharge] = useState(0);
+
+const calculateDeliveryCharge = (subtotal, distance) => {
+  if (subtotal < 50) return 0; // block checkout case (no proceed)
+
+  // Subtotal slab
+  let slab = 0;
+  if (subtotal >= 1000) slab = 0;
+  else if (subtotal >= 500 && subtotal <= 999) slab = 40;
+  else if (subtotal >= 150 && subtotal <= 499) slab = 50;
+  else if (subtotal >= 50 && subtotal <= 149) slab = 30;
+
+  // If free delivery
+  if (slab === 0) return 0;
+
+  // Distance add-on
+  let distAdd = 0;
+  if (distance > 6 && distance <= 10) distAdd = 30;
+  else if (distance > 10 && distance <= 16) distAdd = 40;
+  else if (distance > 16 && distance <= 20) distAdd = 70;
+  else if (distance >= 20) distAdd = 100;
+
+  return slab + distAdd;
+};
+
   const [subtotal, setSubtotal] = useState(0);
   const [promoCode, setPromoCode] = useState("");
   const [discount, setDiscount] = useState(0);
@@ -38,6 +69,7 @@ export default function CartPage() {
   const [customDonation, setCustomDonation] = useState("");
 
   const [currentPoints, setCurrentPoints] = useState(() => {
+   
     const storedPoints = localStorage.getItem("currentPoints");
     return storedPoints ? Number(storedPoints) : 1000;
   });
@@ -47,19 +79,21 @@ export default function CartPage() {
   const donationOptions = [5, 10, 20, 50];
 
   useEffect(() => {
-    const total = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
-    setSubtotal(total);
+  const total = cartItems.length
+    ? cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0)
+    : 0;
+  setSubtotal(total);
 
-    const maxRedeem = Math.min(Math.floor(total * 0.3), currentPoints);
-    if (redeemPoints > maxRedeem) {
-      setRedeemPoints(maxRedeemOptions(maxRedeem));
-    }
+  const maxRedeem = Math.min(Math.floor(total * 0.3), currentPoints);
+  if (redeemPoints > maxRedeem) {
+    setRedeemPoints(maxRedeemOptions(maxRedeem));
+  }
 
-    if (redeemPoints > 0 && discount > 0) setDiscount(0);
+  if (redeemPoints > 0 && discount > 0) setDiscount(0);
 
-    localStorage.setItem("cartItems", JSON.stringify(cartItems));
-    localStorage.setItem("currentPoints", currentPoints);
-  }, [cartItems, redeemPoints, discount, currentPoints]);
+  localStorage.setItem("cartItems", JSON.stringify(cartItems));
+  localStorage.setItem("currentPoints", currentPoints);
+}, [cartItems, redeemPoints, discount, currentPoints]);
 
   useEffect(() => {
     const getSavedAddress = () => {
@@ -92,11 +126,47 @@ export default function CartPage() {
       prev.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, item.quantity - 1) } : item))
     );
 
-  const removeItem = (id) => setCartItems((prev) => prev.filter((item) => item.id !== id));
-  const saveForLater = (item) => {
-    setSavedItems([...savedItems, item]);
-    removeItem(item.id);
-  };
+const removeItem = (id) => {
+  const updatedCart = cartItems.filter((item) => item.id !== id);
+  setCartItems(updatedCart);
+  localStorage.setItem("cartItems", JSON.stringify(updatedCart));
+
+  // Reset totals if cart is now empty
+  if (updatedCart.length === 0) {
+    setSubtotal(0);
+    setDeliveryCharge(0);
+    setDiscount(0);
+    setRedeemPoints(0);
+    setDeliveryTip(5);
+    setDonation(10);
+  }
+};
+
+const saveForLater = (item) => {
+  const updatedCart = cartItems.filter((i) => i.id !== item.id);
+  setCartItems(updatedCart);
+  localStorage.setItem("cartItems", JSON.stringify(updatedCart));
+
+  const existing = savedItems.find((i) => i.name === item.name);
+  const updatedSaved = existing
+    ? savedItems.map((i) =>
+        i.name === item.name ? { ...i, quantity: i.quantity + item.quantity } : i
+      )
+    : [...savedItems, item];
+    
+  setSavedItems(updatedSaved);
+  localStorage.setItem("savedForLater", JSON.stringify(updatedSaved));
+
+  // Reset totals if cart is now empty
+  if (updatedCart.length === 0) {
+    setSubtotal(0);
+    setDeliveryCharge(0);
+    setDiscount(0);
+    setRedeemPoints(0);
+    setDeliveryTip(5);
+    setDonation(10);
+  }
+};
 
   const applyPromo = () => {
     if (redeemPoints > 0) return alert("Cannot apply promo code while redeeming points.");
@@ -123,27 +193,22 @@ export default function CartPage() {
   };
 
  const handleCheckout = () => {
+  if (subtotal < 50) return alert("Order below ₹50 cannot checkout!");
+  if (!canCheckout) return alert("You must add a Print order before checking out Lamination/Binding!");
+
   if (!savedAddress) {
-    alert("Please add your delivery address before checkout!");
-    navigate("/address");
-    return;
+    alert("Please add your delivery address!");
+    return navigate("/address");
   }
 
-  const newPoints = currentPoints - redeemPoints;
-  setCurrentPoints(newPoints);
-  localStorage.setItem("currentPoints", newPoints);
+  const dist = savedAddress?.distance || 0;
+  const charge = calculateDeliveryCharge(subtotal, dist);
 
-- setCartItems([]);
-- setRedeemPoints(0);
-- setDiscount(0);
-- setDeliveryTip(0);
-- setDonation(0);
-- setCustomTip("");
-- setCustomDonation("");
+  const final = Math.max(
+    subtotal + charge + deliveryTip + donation - discount - Math.min(redeemPoints, maxRedeem),
+    0
+  );
 
-  const totalAmount = Math.max(subtotal + 50 + deliveryTip + donation - discount - redeemPoints, 0);
-
-  // Save order details in localStorage for payment page
   const orderData = {
     cartItems,
     subtotal,
@@ -151,14 +216,18 @@ export default function CartPage() {
     donation,
     redeemPoints,
     discount,
-    totalAmount,
+    deliveryCharge: charge,
+    handlingFee: 0,
+    gst: 0,
+    totalAmount: final,
     address: savedAddress,
-    note, // save merchant note
+    note,
   };
 
   localStorage.setItem("currentOrder", JSON.stringify(orderData));
-  navigate("/payment"); // Redirect to Payment page
+  navigate("/payment");
 };
+
 
   if (cartItems.length === 0) {
     return (
@@ -176,10 +245,21 @@ export default function CartPage() {
   }
 
   const maxRedeem = Math.min(Math.floor(subtotal * 0.3), currentPoints);
-  const totalAmount = Math.max(
-    subtotal + 50 + deliveryTip + donation - discount - Math.min(redeemPoints, maxRedeem),
-    0
-  );
+   // ✅ 👉 PASTE THE DELIVERY + DISTANCE CHARGE LOGIC HERE
+  const distance = savedAddress?.distance || 0;
+  const charge = cartItems.length ? calculateDeliveryCharge(subtotal, savedAddress?.distance || 0) : 0;
+
+useEffect(() => {
+  setDeliveryCharge(charge);
+}, [subtotal, savedAddress, cartItems]);
+
+const totalAmount = cartItems.length
+  ? Math.max(
+      subtotal + deliveryCharge + deliveryTip + donation - discount - Math.min(redeemPoints, maxRedeem),
+      0
+    )
+  : 0;
+
   const availableRedeemOptions = discount > 0 ? [] : redeemOptions.filter((p) => p <= maxRedeem);
 
  return (
@@ -275,7 +355,7 @@ export default function CartPage() {
           </motion.div>
         ))}
       </AnimatePresence>
-
+      
       {/* Note for Merchant */}
       <div className="bg-white rounded-2xl shadow-md p-4 m-4 flex flex-col">
         <label className="font-semibold text-gray-700 mb-2">📝 Note for Restaurant / Merchant</label>
@@ -349,22 +429,34 @@ export default function CartPage() {
 
     {/* Scrollable Tip & Donation + Total */}
     <div className="bg-white rounded-t-3xl shadow-xl">
-      <div className="max-h-[29vh] overflow-y-auto p-6 space-y-8 text-sm">
+      <div className="max-h-[29vh] overflow-y-auto p-5 space-y-3 text-sm">
         <div className="flex justify-between">
           <span>🧾 Subtotal</span>
-          <span>₹{subtotal}</span>
+          <span className="text-orange-400 font-semibold">₹{subtotal}</span>
         </div>
-        <div className="flex justify-between text-gray-500">
+              <div className="flex justify-between text-gray-500">
           <span>🚚 Delivery Charges</span>
-          <span>₹50</span>
+          <span className="text-orange-400 font-semibold">₹{deliveryCharge}</span>
         </div>
+       
+<div className="flex justify-between text-sm">
+  <span className="text-gray-600">📦 Handling Fee</span>
+  <span className="flex items-center gap-3">
+    <s className="text-red-500 font-medium">₹20</s>
+    <span className="text-orange-400 font-semibold">₹0</span>
+  </span>
+</div>
+   <div className="flex justify-between text-gray-500">
+    <span>💸 GST</span>
+    <span className="text-orange-400 font-semibold">₹0</span>
+  </div>
         <div className="flex justify-between text-gray-500">
           <span>🎟️ Promo Discount</span>
-          <span>-₹{discount}</span>
+         <span className="text-orange-400 font-semibold">-₹{discount}</span>
         </div>
         <div className="flex justify-between text-gray-500">
           <span>💎 Redeem Points</span>
-          <span>-₹{redeemPoints}</span>
+        <span className="text-orange-400 font-semibold">-₹{redeemPoints}</span>
         </div>
 
        {/* ✅ Delivery Tip Section */}
@@ -455,14 +547,20 @@ export default function CartPage() {
       <div className="border-t p-5 flex flex-col gap-3 bg-white rounded-b-3xl">
         <div className="flex justify-between font-bold text-lg">
           <span>💰 Total</span>
-          <span>₹{totalAmount}</span>
+         <span className="text-orange-400 font-semibold">₹{totalAmount}</span>
         </div>
-        <button
-          onClick={handleCheckout}
-          className="w-full bg-gradient-to-r from-orange-400 to-amber-400 text-white py-3 rounded-2xl font-bold shadow hover:from-orange-500 hover:to-amber-500 transition"
-        >
-          Checkout
-        </button>
+       <button
+  disabled={!canCheckout}
+  onClick={handleCheckout}
+  className={`w-full text-white py-3 rounded-2xl font-bold shadow transition ${
+    canCheckout
+      ? "bg-gradient-to-r from-orange-400 to-amber-400 hover:from-orange-500 hover:to-amber-500 cursor-pointer"
+      : "bg-gray-400 cursor-not-allowed opacity-60"
+  }`}
+>
+  {canCheckout ? "Checkout" : "Printing Required to Checkout ⚠️"}
+</button>
+
       </div>
     </div>
   </div>

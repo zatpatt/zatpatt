@@ -24,20 +24,30 @@ export default function AllInOnePage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
 
+  // ADD THIS:
+const [sosOpen, setSosOpen] = useState(false); // false = collapsed by default
+
   // --- MASTER DATA (your requested categories + SOS contacts) ---
   const MASTER = useMemo(
     () => [
-      {
-        id: "sos",
-        title: "Emergency & SOS Contacts",
-        contacts: [
-          { name: "Ambulance Service", area: "City Ambulance", phone: "108" },
-          { name: "Snake Catcher", area: "Vijay Nagre", phone: "9220088143" },
-          { name: "Fire Helpline", area: "Fire Dept", phone: "101" },
-          { name: "Bike/Car Puncture", area: "Roadside Assist", phone: "9876543210" },
-          { name: "Petrol/Diesel Delivery", area: "Limited Areas", phone: "9801234567" },
-        ],
-      },
+  {
+  id: "sos",
+  title: "Emergency & SOS Contacts",
+  contacts: [
+    {
+      name: "Hospital & Ambulance Service",
+      phone: "", // main empty, use only subContacts
+      subContacts: [
+        { name: "Jijau Hospital", phone: "8669106625" },
+        { name: "Vasind Hospital", phone: "7083609444" },
+      ],
+    },
+    { name: "Snake Catcher", area: "Vijay Nagre", phone: "9220088143" },
+    { name: "Fire Helpline", area: "Vaibhav", phone: "9224676818" },
+    { name: "Bike/Car Puncture", area: "Ganesh Thakre", phone: "9222235777" },
+    { name: "Petrol/Diesel Delivery", area: "Akshay Halker", phone: "9860267576" },
+  ],
+},
 
       {
         id: "groceries-kitchen",
@@ -84,10 +94,10 @@ export default function AllInOnePage() {
         title: "Medical & Health",
         items: [
           "Medicines & First Aid",
-          "Thermometer & BP Monitor",
+          "Thermometer, BP Monitor & More ",
           "Sanitary Pads & Diapers",
           "Health Drinks & Protein Supplements",
-          "Kids & Baby",
+          "Baby Cares",
         ].map((n) => ({ name: n })),
       },
 
@@ -103,11 +113,24 @@ export default function AllInOnePage() {
           "Pet Accessories",
         ].map((n) => ({ name: n })),
       },
+ {
+        id: "events-party",
+        title: "Events & Party Essentials",
+        items: [
+          "Balloons & Party Decoration",
+          "Birthday Banners",
+          "Candle Packs",
+          "Disposable Plates & Cups",
+          "Return Gifts",
+          "Helium Balloons",
+          "Celebration Cakes",
+        ].map((n) => ({ name: n })),
+      },
 
       {
         id: "bills-recharge",
         title: "Bills & Recharge",
-        items: ["Mobile Recharge", "DTH/Cable Recharge", "Electricity Bill Pay"].map((n) => ({ name: n })),
+        items: ["Mobile Recharge", "DTH / Cable Recharge", "Electricity Bill Pay"].map((n) => ({ name: n })),
       },
 
       {
@@ -131,20 +154,7 @@ export default function AllInOnePage() {
         items: ["Salon (Men)", "Beauty & Salon (Women)", "Mehendi Artists"].map((n) => ({ name: n })),
       },
 
-      {
-        id: "events-party",
-        title: "Events & Party Essentials",
-        items: [
-          "Balloons & Party Decoration",
-          "Birthday Banners",
-          "Candle Packs",
-          "Disposable Plates & Cups",
-          "Return Gifts",
-          "Helium Balloons",
-          "Celebration Cakes",
-        ].map((n) => ({ name: n })),
-      },
-    ],
+     ],
     []
   );
 
@@ -217,6 +227,67 @@ export default function AllInOnePage() {
     "#06B6D4",
     "#F97316",
   ];
+const IMAGE_MAP = {
+  "Fruits & Vegetables": "/Images/Fruits-Vegetables.png",
+  "Bread & Bakery": "/Images/Bread-Bakery.png",
+  "Atta, Rice, Oils & Dals": "/Images/Atta-Rice-Oils-Dals.png",
+  "Meat, Fish & Eggs": "/Images/Meat-Fish-Eggs.png",
+  "Masala & Dry Fruits": "/Images/Masala-Dry-Fruits.png",
+  "Breakfast, Sauces & Cereals": "/Images/Breakfast-Sauces-Cereals.png",
+  "Packaged Food": "/Images/Packaged-Food.png",
+
+  "Tea, Coffee & More": "/Images/Tea-Coffee-More.png",
+  "Ice Creams & More": "/Images/Ice-Creams-More.png",
+  "Frozen Food": "/Images/Frozen-Food.png",
+  "Sweet Cravings": "/Images/Sweet-Cravings.png",
+  "Cold Drink & Juices": "/Images/Cold-Drink-Juices.png",
+  "Munchies": "/Images/Munchies.png",
+  "Biscuits & Cookies": "/Images/Biscuits-Cookie.png",
+
+  "Print or Xerox (B/W, Color)": "/Images/Print-or-Xerox(B-W-Color).png",
+  "Photo Print": "/Images/Photo-Print.png",
+  "Banner / Flex Printing": "/Images/Banner-Flex-Printing.png",
+  "Lamination": "/Images/Lamination.png",
+  "Spiral Binding": "/Images/Spiral-Binding.png",
+
+  "Medicines & First Aid": "/Images/Medicines-First-Aid.png",
+  "Thermometer, BP Monitor & More ": "/Images/Health-Drinks-Protein-Supplements.png",
+  "Sanitary Pads & Diapers": "/Images/Sanitary-Pads-Diapers.png",
+  "Health Drinks & Protein Supplements": "/Images/Health-Drinks-Protein-Supplements.png",
+  "Baby Cares": "/Images/Baby-Cares.png",
+
+  "Dog Food": "/Images/Dog-Food.png",
+  "Cat Food": "/Images/Cat-Food.png",
+  "Treats": "/Images/Treats.png",
+  "Litter": "/Images/Litter.png",
+  "Pet Grooming": "/Images/Pet-Grooming.png",
+  "Pet Accessories": "/Images/Pet-Accessories.png",
+
+  "Balloons & Party Decoration": "/Images/Balloons-Party-Decoration.png",
+  "Birthday Banners": "/Images/Birthday-Banners.png",
+  "Candle Packs": "/Images/Candle-Packs.png",
+  "Disposable Plates & Cups": "/Images/Disposable-Plates-Cups.png",
+  "Return Gifts": "/Images/Return-Gifts.png",
+  "Helium Balloons": "/Images/Helium-Balloons.png",
+  "Celebration Cakes": "/Images/Celebration-Cakes.png",
+
+  "Mobile Recharge": "/Images/Mobile-Recharge.png",
+  "DTH / Cable Recharge": "/Images/DTH-Cable-Recharge.png",
+  "Electricity Bill Pay": "/Images/Electricity-Bill-Pay.png",
+
+  "Electrician / Plumber / Carpenter": "/Images/Electrician-Plumber-Carpenter.png",
+  "Mobile Repair": "/Images/Mobile-Repair.png",
+  "AC / Cooler Repair": "/Images/AC-Cooler-Repair.png",
+  "Water Purifier / Geyser Repair": "/Images/Water-Purifier-Geyser-Repair.png",
+  "Refrigerator / TV / Washing Machine Repair": "/Images/Refrigerator-TV-Washing-Machine-Repair.png",
+  "Inverter & Battery Repair": "/Images/Inverter-Battery-Repair.png",
+  "Pest Control": "/Images/Pest-Control.png",
+  "Painting Services": "/Images/Painting-Services.png",
+
+  "Salon (Men)": "/Images/Salon(Men).png",
+  "Beauty & Salon (Women)": "/Images/Beauty-Salon(Women).png",
+  "Mehendi Artists": "/Images/Mehendi-Artists.png",
+};
 
   return (
     <div className="min-h-screen bg-[#fff9f4]">
@@ -246,61 +317,70 @@ export default function AllInOnePage() {
         </div>
       </div>
 
-      {/* SOS — compact red box */}
-      {MASTER.filter((sec) => sec.id === "sos").map((sos) => (
-        <div
-          key={sos.id}
-          className="mx-4 mt-6 p-4 rounded-2xl"
-          style={{ background: "#ff000015", boxShadow: "0 0 18px #ff000033", border: "1px solid #ff5555" }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <LifeBuoy size={18} className="text-red-600" />
-              <h2 className="text-lg font-bold text-red-600">🚨 {sos.title}</h2>
-            </div>
-            <div className="text-xs text-gray-500">Keep handy</div>
-          </div>
+{/* SOS — compact red box */}
+{MASTER.filter((sec) => sec.id === "sos").map((sos) => (
+  <div
+    key={sos.id}
+    className="mx-4 mt-6 p-4 rounded-2xl"
+    style={{ background: "#ff000015", boxShadow: "0 0 18px #ff000033", border: "1px solid #ff5555" }}
+  >
+    <div
+  className="flex items-center justify-between mb-3 cursor-pointer"
+  onClick={() => setSosOpen(!sosOpen)}
+>
+  <div className="flex items-center gap-2">
+    <LifeBuoy size={18} className="text-red-600" />
+    <h2 className="text-lg font-bold text-red-600">🚨 {sos.title}</h2>
+  </div>
+  <div className="flex items-center gap-2 text-xs text-gray-500">
+   {sosOpen ? "▲" : "▼"}
+  </div>
+</div>
 
-          <div className="space-y-2">
-            {sos.contacts.map((c, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-lg shadow-sm p-2 flex items-center gap-3"
-                style={{ alignItems: "center" }}
-              >
-                {/* small square avatar */}
+  {sosOpen && (
+  <div className="space-y-2">
+    {sos.contacts.map((c, i) => (
+      <div key={i} className="bg-white rounded-lg shadow-sm p-2 flex flex-col gap-1">
+        {(c.subContacts ? c.subContacts : [c]).map((contact, idx) => (
+          <div
+            key={idx}
+            className="flex items-center justify-between text-sm text-gray-900 bg-white px-2 py-1 rounded-lg shadow"
+          >
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
                 <div
-                  className="w-10 h-10 rounded-sm flex items-center justify-center text-white font-semibold text-sm"
+                  className="w-8 h-8 rounded-sm flex items-center justify-center text-white font-semibold text-sm"
                   style={{ background: "#e53935" }}
                 >
-                  {String(c.name).trim().charAt(0)}
+                  {contact.name.charAt(0)}
                 </div>
-
-                {/* single-line look: name + area */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-gray-900 truncate">
-                      {c.name}
-                      {/* area inline, smaller */}
-                      <span className="text-xs text-gray-500 ml-2">• {c.area}</span>
-                    </div>
-                    {/* phone (smaller) */}
-                    <div className="text-xs text-gray-700 ml-2">{c.phone}</div>
-                  </div>
-                </div>
-
-                {/* call button */}
-                <a
-                  href={`tel:${c.phone}`}
-                  className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow active:scale-95"
-                >
-                  Call
-                </a>
+                <span className="truncate font-medium">{contact.name}</span>
               </div>
-            ))}
+              {c.name && c.subContacts && (
+                <span className="text-xs text-gray-500 ml-10">{c.name}</span>
+              )}
+              {!c.subContacts && c.area && (
+                <span className="text-xs text-gray-500 ml-10">{c.area}</span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-700">{contact.phone}</span>
+              <a
+                href={`tel:${contact.phone}`}
+                className="bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-semibold shadow active:scale-95"
+              >
+                Call
+              </a>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
+    ))}
+  </div>
+)}
+  </div>
+))}
 
       {/* Content */}
       <div className="mt-5 space-y-6 px-2 pb-24">
@@ -321,8 +401,10 @@ export default function AllInOnePage() {
         ) : filtered.length === 0 ? (
           <div className="text-center text-gray-500 mt-12">No categories match your search.</div>
         ) : (
-          filtered.map((sec) => (
-            <section key={sec.id} className="px-4">
+          filtered
+  .filter((sec) => sec.id !== "sos") // <-- exclude SOS
+  .map((sec) => (
+    <section key={sec.id} className="px-4">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-base font-semibold text-gray-800">{sec.title}</h2>
                 <div className="text-xs text-gray-400 flex items-center gap-2">
@@ -331,36 +413,82 @@ export default function AllInOnePage() {
               </div>
 
               {/* If section has items (normal sections) render horizontal cards */}
-              {sec.items && (
-                <div className="flex gap-3 overflow-x-auto pb-3">
-                  {sec.items.map((it, idx) => {
-                    const color = palette[idx % palette.length];
-                    return (
-                      <div
-                        key={it.name}
-                        onClick={() => navigate(`/category/${encodeURIComponent(it.name)}`)}
-                        className="w-36 min-w-[9rem] bg-white rounded-2xl shadow-sm p-3 flex-none cursor-pointer hover:shadow-md transition"
-                      >
-                        <div
-                          className="w-12 h-12 rounded-full mb-2 flex items-center justify-center mx-auto"
-                          style={{
-                            background: `${color}22`,
-                            boxShadow: `0 6px 18px ${color}33`,
-                          }}
-                        >
-                          {/* Section icon used as tile icon for simplicity */}
-                          <div className="text-white/0">
-                            <IconForSection sectionId={sec.id} />
-                          </div>
-                        </div>
+{sec.items && (
+  <div className="grid grid-cols-3 gap-3 pb-6">
+    {sec.items.map((it) => (
+      <div
+        key={it.name}
+        onClick={() => {
+          if (sec.id === "bills-recharge") {  // ✅ fixed id check
+            let tab = "mobile";
+            const name = it.name.toLowerCase();
 
-                        <div className="text-xs text-center font-semibold text-gray-800 leading-tight">{it.name}</div>
-                        <div className="text-[11px] text-center text-gray-400 mt-1">{sec.title}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+            if (name.includes("dth") || name.includes("cable")) tab = "dth";
+            else if (name.includes("electricity") || name.includes("bill")) tab = "electricity";
+           navigate("/bills-recharge", { state: { activeTab: tab } });
+          } else if (sec.id === "print-services") { // keep print logic too if needed
+            let tab = "xerox";
+            const name = it.name.toLowerCase();
+            if (name.includes("photo")) tab = "photo";
+            else if (name.includes("banner") || name.includes("flex")) tab = "banner";
+            else if (name.includes("lamination")) tab = "lamination";
+            else if (name.includes("spiral") || name.includes("binding")) tab = "binding";
+
+            navigate("/print-services", { state: { activeTab: tab } });
+          } 
+
+else if (sec.id === "grooming-wellness") { // keep print logic too if needed
+            let tab = "salon-men";
+            const name = it.name.toLowerCase();
+            if (name.includes("beauty") || name.includes("women")) tab = "beauty-salon-women";
+            else if (name.includes("mehendi") || name.includes("artists")) tab = "mehendi-artists";
+
+            navigate("/grooming-wellness", { state: { activeTab: tab } });
+          } 
+
+else if (sec.id === "home-services") {
+  let tab = "mobile-repair"; // default
+ const name = it.name.toLowerCase();
+ if (name.includes("mobilerepair")) tab = "mobile-repair";
+ else if (name.includes("fridge") || name.includes("tv") || name.includes("washing") || name.includes("machine"))
+    tab = "refrigerator-tv-washing-machine-repair";
+            else if (name.includes("ac") || name.includes("cooler")) tab = "ac-cooler-repair";
+            else if (name.includes("purifier") || name.includes("geyser") || name.includes("water") || name.includes("heater"))
+    tab = "water-purifier-geyser-repair";
+            
+            else if (name.includes("inverter") || name.includes("battery")) tab = "inverter-battery-repair";
+            else if (name.includes("pest")) tab = "pest-control";
+           else if (name.includes("paint")) tab = "painting-services";
+           else if (name.includes("electrician") || name.includes("plumber") || name.includes("carpenter"))
+    tab = "electrician-plumber-carpenter";
+
+  navigate("/home-services", { state: { activeTab: tab } });
+}
+else if (it.name.toLowerCase().includes("birthday banner")) {
+        navigate("/print-services", { state: { activeTab: "banner" } });
+      } 
+else {
+            navigate(`/category/${encodeURIComponent(it.name)}`);
+          }
+        }}
+        className="bg-white rounded-2xl shadow-sm p-3 flex flex-col items-center cursor-pointer hover:shadow-md transition"
+      >
+        <div className="w-20 h-20 rounded-xl mb-2 overflow-hidden">
+          <img
+            src={IMAGE_MAP[it.name] || "/Images/default.png"}
+            alt={it.name}
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <div className="text-xs text-center font-semibold text-gray-800 leading-tight">
+          {it.name}
+        </div>
+      </div>
+    ))}
+  </div>
+)}
+
+              
             </section>
           ))
         )}

@@ -14,13 +14,13 @@ const productsList = [
   { id: 8, name: "Banana (1kg)", price: 60, img: "https://via.placeholder.com/80" },
 ];
 
-const trendingSearches = ["Biryani", "Milk", "Eggs", "Snacks", "Fruits", "Paneer"];
-
 export default function SearchPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const initialQuery = location.state?.query || "";
 
+  // ------------------- State Variables -------------------
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [recentSearches, setRecentSearches] = useState(() => {
     const stored = localStorage.getItem("recentSearches");
@@ -30,21 +30,73 @@ export default function SearchPage() {
     const stored = localStorage.getItem("cartItems");
     return stored ? JSON.parse(stored) : [];
   });
-  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [merchantResults, setMerchantResults] = useState([]);
+  const [restaurantResults, setRestaurantResults] = useState([]);
+  const [serviceResults, setServiceResults] = useState([]);
+  const [emergencyResults, setEmergencyResults] = useState([]);
 
+  // ------------------- Global Search Data -------------------
+  const storedProducts = JSON.parse(localStorage.getItem("products")) || [];
+  const storedMerchants = JSON.parse(localStorage.getItem("merchants")) || [];
+  const storedRestaurants = JSON.parse(localStorage.getItem("restaurants")) || [];
+
+  const demoServices = [
+    "Fruits & Vegetables",
+    "Mobile Recharge",
+    "Electrician / Plumber / Carpenter",
+    "Dog Food",
+    "Photo Print",
+    "Snake Catcher",
+  ];
+
+  const demoEmergency = [
+    "Hospital & Ambulance",
+    "Jijau Hospital",
+    "Vasind Hospital",
+    "Fire Helpline",
+    "Snake Catcher Vijay",
+  ];
+
+  // ------------------- Search Effect -------------------
   useEffect(() => {
     if (!searchQuery.trim()) {
       setFilteredProducts([]);
+      setMerchantResults([]);
+      setRestaurantResults([]);
+      setServiceResults([]);
+      setEmergencyResults([]);
       return;
     }
-    const results = productsList.filter((p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-    setFilteredProducts(results);
+
+    const q = searchQuery.toLowerCase();
+
+    setFilteredProducts([
+      ...productsList.filter((p) => p.name.toLowerCase().includes(q)),
+      ...storedProducts.filter((p) => p.name.toLowerCase().includes(q)),
+    ]);
+
+    setMerchantResults(storedMerchants.filter((m) => m.name.toLowerCase().includes(q)));
+    setRestaurantResults(storedRestaurants.filter((r) => r.name.toLowerCase().includes(q)));
+    setServiceResults(demoServices.filter((s) => s.toLowerCase().includes(q)));
+    setEmergencyResults(demoEmergency.filter((e) => e.toLowerCase().includes(q)));
   }, [searchQuery]);
+
+  // ------------------- Search & Cart Tracking -------------------
+  const incrementSearchCount = (productName) => {
+    const counts = JSON.parse(localStorage.getItem("searchCounts") || "{}");
+    counts[productName] = (counts[productName] || 0) + 1;
+    localStorage.setItem("searchCounts", JSON.stringify(counts));
+  };
+
+  const incrementCartCount = (product) => {
+    const counts = JSON.parse(localStorage.getItem("cartCounts") || "{}");
+    counts[product.id] = (counts[product.id] || 0) + 1;
+    localStorage.setItem("cartCounts", JSON.stringify(counts));
+  };
 
   const handleSearchSubmit = (query) => {
     if (!query.trim()) return;
+    incrementSearchCount(query);
     setSearchQuery(query);
     setRecentSearches((prev) => {
       const updated = [query, ...prev.filter((item) => item !== query)];
@@ -53,6 +105,30 @@ export default function SearchPage() {
     });
   };
 
+  const clearRecent = () => {
+    setRecentSearches([]);
+    localStorage.removeItem("recentSearches");
+  };
+
+  // ------------------- Merged Trending & Recommended Products -------------------
+  const getMergedProducts = () => {
+    const searchCounts = JSON.parse(localStorage.getItem("searchCounts") || "{}");
+    const cartCounts = JSON.parse(localStorage.getItem("cartCounts") || "{}");
+    const allProducts = [...productsList, ...storedProducts];
+
+    const scoredProducts = allProducts.map((p) => ({
+      ...p,
+      score: (searchCounts[p.name] || 0) + (cartCounts[p.id] || 0),
+    }));
+
+    scoredProducts.sort((a, b) => b.score - a.score);
+
+    return scoredProducts.slice(0, 6);
+  };
+
+  const mergedProducts = getMergedProducts();
+
+  // ------------------- Add to Cart -------------------
   const addToCart = (product) => {
     const exists = cartItems.find((item) => item.id === product.id);
     let updatedCart;
@@ -65,28 +141,20 @@ export default function SearchPage() {
     }
     setCartItems(updatedCart);
     localStorage.setItem("cartItems", JSON.stringify(updatedCart));
+    incrementCartCount(product);
   };
 
-  const clearRecent = () => {
-    setRecentSearches([]);
-    localStorage.removeItem("recentSearches");
-  };
-
-  const handleTrendingClick = (term) => handleSearchSubmit(term);
-
+  // ------------------- JSX -------------------
   return (
     <div className="min-h-screen bg-[#FFF7ED] flex flex-col">
-      {/* ---------- Header with Back Button + Search ---------- */}
+      {/* Header */}
       <header className="bg-orange-500 text-white py-4 px-4 shadow-lg w-full relative flex items-center justify-center">
-        {/* Back Button */}
         <button
           onClick={() => navigate(-1)}
           className="absolute left-4 top-3 p-2 rounded-full bg-white shadow hover:bg-gray-100 transition"
         >
           <ArrowLeft className="w-5 h-5 text-orange-500" />
         </button>
-
-        {/* Search Bar */}
         <div className="flex items-center bg-white rounded-full px-4 py-2 w-[80%] max-w-md">
           <Search className="text-gray-400 mr-2 w-5 h-5" />
           <input
@@ -108,7 +176,7 @@ export default function SearchPage() {
         </div>
       </header>
 
-      {/* ---------- Recent Searches ---------- */}
+      {/* Recent Searches */}
       {recentSearches.length > 0 && (
         <div className="px-4 py-2">
           <div className="flex justify-between items-center mb-2">
@@ -132,38 +200,51 @@ export default function SearchPage() {
         </div>
       )}
 
-      {/* ---------- Trending Searches ---------- */}
-      <div className="px-4 py-2">
-        <span className="font-semibold text-gray-700 mb-2 block">Trending</span>
-        <div className="flex gap-2 overflow-x-auto py-1">
-          {trendingSearches.map((term, idx) => (
-            <motion.button
-              key={idx}
-              onClick={() => handleTrendingClick(term)}
-              whileTap={{ scale: 0.9 }}
-              className="flex-shrink-0 bg-amber-100 text-amber-800 px-4 py-2 rounded-full whitespace-nowrap hover:bg-amber-200 transition"
-            >
-              {term}
-            </motion.button>
-          ))}
-        </div>
-      </div>
-
-      {/* ---------- Search Results ---------- */}
-      <div className="flex-1 p-4 space-y-3 overflow-y-auto">
-        {searchQuery && filteredProducts.length === 0 && (
-          <div className="text-center mt-16">
-            <div className="flex justify-center mb-4">
-              <img
-  src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 24 24' fill='none' stroke='%23f97316' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/><text x='6' y='25' font-size='4' fill='%23f97316'>No Results</text></svg>"
-  alt="No Results"
-  className="w-40 h-40 object-contain opacity-90"
-/>
-            </div>
-            <p className="text-gray-500 text-lg mb-2">Oops! No results found</p>
-            <p className="text-orange-600 font-semibold">Try searching for something else</p>
+      {/* Merged Products Grid */}
+      {!searchQuery && (
+        <div className="mt-6 px-4">
+          <h2 className="font-bold text-gray-800 text-lg mb-3 flex items-center gap-2">
+            🔥 Trending & Recommended
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {mergedProducts.map((p) => (
+              <motion.div
+                key={p.id}
+                whileTap={{ scale: 0.95 }}
+                className="bg-white rounded-2xl shadow-md p-3 flex flex-col items-center cursor-pointer border border-orange-100"
+                onClick={() => navigate("/productDetails", { state: { product: p } })}
+              >
+                <img src={p.img} alt={p.name} className="w-20 h-20 rounded-xl object-cover" />
+                <h3 className="font-medium text-gray-800 text-center text-sm mt-2">{p.name}</h3>
+                <p className="text-orange-600 text-sm font-semibold mt-1">₹{p.price}</p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    addToCart(p);
+                  }}
+                  className="bg-orange-400 text-white px-4 py-1 rounded-full text-xs font-semibold mt-2"
+                >
+                  Add
+                </button>
+              </motion.div>
+            ))}
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Search Results / Emergency */}
+      <div className="flex-1 p-4 space-y-3 overflow-y-auto">
+        {searchQuery &&
+          filteredProducts.length === 0 &&
+          merchantResults.length === 0 &&
+          restaurantResults.length === 0 &&
+          serviceResults.length === 0 &&
+          emergencyResults.length === 0 && (
+            <div className="text-center mt-16">
+              <p className="text-gray-500 text-lg mb-2">Oops! No results found</p>
+              <p className="text-orange-600 font-semibold">Try searching for something else</p>
+            </div>
+          )}
 
         {filteredProducts.map((product) => (
           <motion.div
@@ -190,9 +271,36 @@ export default function SearchPage() {
             </button>
           </motion.div>
         ))}
+
+        {/* Emergency Section */}
+        {emergencyResults.length > 0 && (
+          <div className="mt-4">
+            <h2 className="font-bold text-red-600 mb-3 flex items-center gap-2">
+              🚨 Emergency Contacts
+            </h2>
+            <div className="bg-white rounded-2xl shadow-md p-3 space-y-2">
+              {emergencyResults.map((item, idx) => (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex justify-between items-center border-b pb-2 last:border-none"
+                >
+                  <span className="text-gray-800 font-medium">{item}</span>
+                  <button
+                    onClick={() => window.location.href = "tel:8669106625"}
+                    className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-semibold"
+                  >
+                    Call
+                  </button>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ---------- Sticky Cart Summary ---------- */}
+      {/* Sticky Cart */}
       {cartItems.length > 0 && (
         <div className="sticky bottom-0 bg-white shadow-t p-4 flex justify-between items-center border-t">
           <span className="font-semibold">{cartItems.length} items in cart</span>

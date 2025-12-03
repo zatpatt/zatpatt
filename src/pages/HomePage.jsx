@@ -6,6 +6,9 @@ import ShimmerLoader from "../components/ShimmerLoader";
 import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
+import { Heart } from "lucide-react";
+import { useFavorites } from "../context/FavoritesContext";
+
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
@@ -15,6 +18,8 @@ export default function HomePage() {
   const [nearbyRestaurants, setNearbyRestaurants] = useState([]);
   const [activeTab, setActiveTab] = useState("All");
   const [cartCount, setCartCount] = useState(0);
+
+const { favorites, addFavorite, removeFavorite } = useFavorites();
 
   // show modal only if no saved GPS and no searchedLocation
   const [showLocationModal, setShowLocationModal] = useState(() => {
@@ -411,48 +416,71 @@ export default function HomePage() {
         ) : filteredRestaurants.length > 0 ? (
           <motion.div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
   {filteredRestaurants.map((r) => (
-    <motion.div
-      key={r.id}
-      onClick={() => navigate(`/restaurant/${restaurant.id}`)}   // FULL CARD CLICKABLE
-      className="bg-white rounded-xl shadow hover:shadow-md transition-all overflow-hidden border border-orange-50 cursor-pointer"
+   <motion.div
+  key={r.id}
+  onClick={() => navigate(`/restaurant/${r.id}`)}
+  className="bg-white rounded-xl shadow hover:shadow-md transition-all overflow-hidden border border-orange-50 cursor-pointer relative"
+>
+  {/* Restaurant Image */}
+  <div className="relative">
+    <img src={r.img} alt={r.name} className="w-full h-36 object-cover" />
+
+    {/* Favorite Heart */}
+   <button
+  onClick={(e) => {
+    e.stopPropagation(); // prevent card click
+    // Check if this restaurant is already in favorites
+    const isFav = favorites.find((f) => f.id === r.id);
+    if (isFav) removeFavorite(r.id);
+    else addFavorite({ ...r, type: r.isVeg ? "Veg" : "Non-Veg", amount: r.price });
+  }}
+  className={`absolute top-2 right-2 p-1 rounded-full bg-white/70 hover:bg-white transition`}
+>
+  <Heart
+    size={20}
+    className={`transition-all ${
+      favorites.find((f) => f.id === r.id)
+        ? "text-orange-500 fill-current"
+        : "text-gray-400"
+    }`}
+  />
+</button>
+  </div>
+
+  <div className="p-3 flex flex-col gap-2">
+    {/* NAME + VEG TAG */}
+    <div className="flex justify-between items-center">
+      <h3 className="font-semibold text-gray-800">{r.name}</h3>
+      <span
+        className={`text-xs px-2 py-1 rounded-full ${
+          r.isVeg ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+        }`}
+      >
+        {r.isVeg ? "Pure Veg" : "Non-Veg"}
+      </span>
+    </div>
+
+    {/* RATING • TIME • DISTANCE */}
+    <p className="text-sm text-gray-500">
+      {r.rating} • {r.time} • {r.distance} km
+    </p>
+
+    {/* PRICE */}
+    <p className="text-sm text-gray-600">₹{r.price}</p>
+
+    {/* ONLY VIEW BUTTON */}
+    <button
+      onClick={(e) => {
+        e.stopPropagation(); // prevent card click
+        navigate(`/restaurant/${r.id}`);
+      }}
+      className="w-full mt-2 bg-orange-500 text-white py-2 rounded-xl shadow hover:bg-orange-600 transition"
     >
-      <img src={r.img} alt={r.name} className="w-full h-36 object-cover" />
+      View
+    </button>
+  </div>
+</motion.div>
 
-      <div className="p-3 flex flex-col gap-2">
-
-        {/* NAME + VEG TAG */}
-        <div className="flex justify-between items-center">
-          <h3 className="font-semibold text-gray-800">{r.name}</h3>
-          <span
-            className={`text-xs px-2 py-1 rounded-full ${
-              r.isVeg ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-            }`}
-          >
-            {r.isVeg ? "Pure Veg" : "Non-Veg"}
-          </span>
-        </div>
-
-        {/* RATING • TIME • DISTANCE */}
-        <p className="text-sm text-gray-500">
-          {r.rating} • {r.time} • {r.distance} km
-        </p>
-
-        {/* PRICE */}
-        <p className="text-sm text-gray-600">₹{r.price}</p>
-
-        {/* ONLY VIEW BUTTON */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation(); // prevent card click conflict
-            navigate(`/restaurant/${r.id}`);
-          }}
-          className="w-full mt-2 bg-orange-500 text-white py-2 rounded-xl shadow hover:bg-orange-600 transition"
-        >
-          View
-        </button>
-
-      </div>
-    </motion.div>
   ))}
 </motion.div>
 
