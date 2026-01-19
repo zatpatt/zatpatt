@@ -1,4 +1,4 @@
-// src/pages/HomeServicesPage.jsx
+// src/pages/GroomingWellnesssPage.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Phone, Wrench, Smartphone, Snowflake, Droplet, Tv, BatteryCharging, Bug, Paintbrush } from "lucide-react";

@@ -1,3 +1,4 @@
+//src\pages\AddressPage.jsx
 import React, { useState, useEffect } from "react";
 import {
   ArrowLeft,
@@ -13,6 +14,8 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { createAddress, getAddressList } from "../services/addressApi";
+
 
 export default function AddressPage() {
   const navigate = useNavigate();
@@ -24,36 +27,97 @@ export default function AddressPage() {
   const [phone, setPhone] = useState("");
   const [locating, setLocating] = useState(false);
   const [coords, setCoords] = useState(null);
+  const [latitude, setLatitude] = useState(null);
+  const [longitude, setLongitude] = useState(null);
+
+
+  useEffect(() => {
+  if (!area || !city) return;
+
+  const timer = setTimeout(async () => {
+    try {
+      const query = encodeURIComponent(
+        `${building || ""}, ${area}, ${landmark || ""}, ${city}`
+      );
+
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${query}`
+      );
+      const data = await res.json();
+
+      if (data?.length) {
+        const lat = Number(data[0].lat);
+        const lon = Number(data[0].lon);
+
+        setLatitude(lat);
+        setLongitude(lon);
+        setCoords({ latitude: lat, longitude: lon });
+      }
+    } catch (err) {
+      console.error("Geocoding failed", err);
+    }
+  }, 800); // 👈 debounce
+
+  return () => clearTimeout(timer);
+}, [building, area, landmark, city]);
 
   // Load saved addresses
-  useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem("addresses")) || [];
-    setAddresses(stored);
-  }, []);
+  // useEffect(() => {
+  //   const stored = JSON.parse(localStorage.getItem("addresses")) || [];
+  //   setAddresses(stored);
+  // }, []);
 
-  // Save to localStorage
-  const saveAddresses = (newAddresses) => {
-    localStorage.setItem("addresses", JSON.stringify(newAddresses));
-    setAddresses(newAddresses);
-  };
+  // // Save to localStorage
+  // const saveAddresses = (newAddresses) => {
+  //   localStorage.setItem("addresses", JSON.stringify(newAddresses));
+  //   setAddresses(newAddresses);
+  // };
 
   // Add address
-  const handleAddAddress = () => {
-    if (!isFormValid()) return;
+const handleAddAddress = async () => {
+  if (!isFormValid()) return;
 
-    const newAddress = {
-      id: Date.now(),
+  if (!latitude || !longitude) {
+    alert("Please select a valid location on map");
+    return;
+  }
+
+  try {
+    const payload = {
       building,
       area,
       landmark,
       city,
       phone,
-      coords,
-      isDefault: addresses.length === 0,
+      is_default: addresses.length === 0,
+      latitude,
+      longitude,
     };
 
-    const updated = [...addresses, newAddress];
-    saveAddresses(updated);
+    const res = await createAddress(payload);
+
+    if (!res.status) {
+      alert("Failed to save address");
+      return;
+    }
+
+    const list = await getAddressList();
+
+    if (list.status) {
+      const formatted = list.addresses.map((addr) => ({
+        id: addr.address_id,
+        building: addr.building,
+        area: addr.area,
+        landmark: addr.landmark,
+        city: addr.city,
+        phone: addr.mobile,
+        isDefault: addr.is_default,
+        latitude: addr.latitude,
+        longitude: addr.longitude,
+      }));
+
+      setAddresses(formatted);
+    }
 
     setBuilding("");
     setArea("");
@@ -61,91 +125,157 @@ export default function AddressPage() {
     setCity("");
     setPhone("");
     setCoords(null);
+    setLatitude(null);
+    setLongitude(null);
+  } catch (err) {
+    console.error(err);
+    alert("Failed to save address");
+  }
+};
+
+
+
+useEffect(() => {
+  const fetchAddresses = async () => {
+    try {
+      const res = await getAddressList();
+
+      if (!res.status) {
+        alert("Failed to load addresses");
+        return;
+      }
+
+      const formatted = res.addresses.map((addr) => ({
+  id: addr.address_id,
+  building: addr.building,
+  area: addr.area,
+  landmark: addr.landmark,
+  city: addr.city,
+  phone: addr.mobile,
+  isDefault: addr.is_default,
+  latitude: addr.latitude,
+  longitude: addr.longitude,
+}));
+
+
+      setAddresses(formatted);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to load addresses");
+    }
   };
+
+  fetchAddresses();
+}, []);
+
+
 
   // Delete
-  const handleDelete = (id) => {
-    const updated = addresses.filter((addr) => addr.id !== id);
-    saveAddresses(updated);
-  };
+ const handleDelete = (id) => {
+  setAddresses((prev) => prev.filter((addr) => addr.id !== id));
+};
 
   // Set Default
-  const handleSetDefault = (id) => {
-    const updated = addresses.map((addr) =>
+ const handleSetDefault = (id) => {
+  setAddresses((prev) =>
+    prev.map((addr) =>
       addr.id === id
         ? { ...addr, isDefault: true }
         : { ...addr, isDefault: false }
-    );
-    saveAddresses(updated);
-  };
+    )
+  );
+};
+
 
   // Deliver to address
   const handleDeliverTo = (addr) => {
-    localStorage.setItem("selectedAddress", JSON.stringify(addr));
-    alert(`✅ Delivery address set to: ${addr.building}, ${addr.area}`);
-    navigate("/cart"); // Redirect to cart or checkout page
-  };
+  // ✅ SAVE SELECTED ADDRESS ID
+  localStorage.setItem(
+    "selectedAddressId",
+    JSON.stringify(addr.id || addr.address_id)
+  );
+
+  // (optional but useful)
+  localStorage.setItem(
+    "selectedAddress",
+    JSON.stringify(addr)
+  );
+
+  navigate("/cart"); // 🔁 go back to CartPage
+};
+
 
   // Validation
   const isValidPhone = (value) => /^[0-9]{10}$/.test(value);
-  const isFormValid = () =>
-    building.trim() &&
-    area.trim() &&
-    landmark.trim() &&
-    city.trim() &&
-    isValidPhone(phone);
+ const isFormValid = () =>
+  building.trim() &&
+  area.trim() &&
+  landmark.trim() &&
+  city.trim() &&
+  isValidPhone(phone) &&
+  latitude &&
+  longitude;
+
 
   // Use Current Location
-  const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation not supported by your browser.");
-      return;
-    }
+ const handleUseCurrentLocation = () => {
+  if (!navigator.geolocation) {
+    alert("Geolocation not supported by your browser.");
+    return;
+  }
 
-    setLocating(true);
+  setLocating(true);
 
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setCoords({ latitude, longitude });
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const { latitude: lat, longitude: lon } = pos.coords;
 
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+      // ✅ set state first
+      setLatitude(lat);
+      setLongitude(lon);
+      setCoords({ latitude: lat, longitude: lon });
+
+      try {
+        // ✅ use coords directly, NOT state
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+        );
+        const data = await response.json();
+
+        if (data?.address) {
+          const detectedArea =
+            data.address.suburb ||
+            data.address.village ||
+            data.address.neighbourhood ||
+            data.address.road ||
+            "";
+
+          const detectedCity =
+            data.address.city ||
+            data.address.town ||
+            data.address.county ||
+            "";
+
+          setArea(detectedArea);
+          setCity(detectedCity);
+          setLandmark(
+            data.display_name?.split(",").slice(0, 2).join(", ") || ""
           );
-          const data = await response.json();
-
-          if (data.address) {
-            const detectedArea =
-              data.address.suburb ||
-              data.address.village ||
-              data.address.neighbourhood ||
-              data.address.road ||
-              "";
-            const detectedCity =
-              data.address.city ||
-              data.address.town ||
-              data.address.county ||
-              "";
-
-            setArea(detectedArea);
-            setCity(detectedCity);
-            setLandmark(
-              data.display_name.split(",").slice(0, 2).join(", ") || ""
-            );
-          }
-        } catch (err) {
-          alert("Unable to fetch location details. Try again.");
-        } finally {
-          setLocating(false);
         }
-      },
-      (err) => {
-        alert("Location access denied. Please enable it in settings.");
+      } catch (err) {
+        console.error(err);
+        alert("Unable to fetch location details.");
+      } finally {
         setLocating(false);
       }
-    );
-  };
+    },
+    () => {
+      alert("Location access denied. Please enable it in settings.");
+      setLocating(false);
+    }
+  );
+};
+
 
   return (
     <div className="min-h-screen bg-[#FFF7ED] flex flex-col">
@@ -264,6 +394,23 @@ export default function AddressPage() {
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              type="text"
+              value={latitude ?? ""}
+              disabled
+              placeholder="Latitude"
+              className="w-full bg-gray-100 border border-gray-200 rounded-lg p-2 text-sm text-gray-500"
+            />
+            <input
+              type="text"
+              value={longitude ?? ""}
+              disabled
+              placeholder="Longitude"
+              className="w-full bg-gray-100 border border-gray-200 rounded-lg p-2 text-sm text-gray-500"
+            />
+          </div>
+
           {/* Save */}
           <button
             onClick={handleAddAddress}
@@ -335,19 +482,19 @@ export default function AddressPage() {
                   </div>
 
                   {/* Map Preview */}
-                  {addr.coords && (
-                    <div className="w-full h-36 rounded-lg overflow-hidden mt-3">
-                      <iframe
-                        title="saved-map"
-                        width="100%"
-                        height="100%"
-                        style={{ border: 0 }}
-                        loading="lazy"
-                        allowFullScreen
-                        src={`https://www.google.com/maps?q=${addr.coords.latitude},${addr.coords.longitude}&z=15&output=embed`}
-                      ></iframe>
-                    </div>
-                  )}
+                 {addr.latitude && addr.longitude && (
+                  <div className="w-full h-36 rounded-lg overflow-hidden mt-3">
+                    <iframe
+                      title="saved-map"
+                      width="100%"
+                      height="100%"
+                      style={{ border: 0 }}
+                      loading="lazy"
+                      allowFullScreen
+                      src={`https://www.google.com/maps?q=${addr.latitude},${addr.longitude}&z=15&output=embed`}
+                    />
+                  </div>
+                )}
 
                   {/* Deliver To Button */}
                   <button

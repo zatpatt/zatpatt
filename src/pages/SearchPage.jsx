@@ -1,23 +1,30 @@
+//src\pages\SearchPage.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, ShoppingCart, X, Search } from "lucide-react";
 import { motion } from "framer-motion";
+import { searchProductsApi } from "../services/searchApi";
+import { addToCartApi, getCartList, goToCartApi } from "../services/cartApi";
 
-const productsList = [
-  { id: 1, name: "Hyderabadi Biryani", price: 220, img: "https://via.placeholder.com/80" },
-  { id: 2, name: "Paneer Butter Masala", price: 180, img: "https://via.placeholder.com/80" },
-  { id: 3, name: "Eggs (12 pcs)", price: 90, img: "https://via.placeholder.com/80" },
-  { id: 4, name: "Milk 1L", price: 50, img: "https://via.placeholder.com/80" },
-  { id: 5, name: "Maggi Noodles", price: 40, img: "https://via.placeholder.com/80" },
-  { id: 6, name: "Apple (1kg)", price: 150, img: "https://via.placeholder.com/80" },
-  { id: 7, name: "Bread", price: 35, img: "https://via.placeholder.com/80" },
-  { id: 8, name: "Banana (1kg)", price: 60, img: "https://via.placeholder.com/80" },
-];
+// const productsList = [
+//   { id: 1, name: "Hyderabadi Biryani", price: 220, img: "https://via.placeholder.com/80" },
+//   { id: 2, name: "Paneer Butter Masala", price: 180, img: "https://via.placeholder.com/80" },
+//   { id: 3, name: "Eggs (12 pcs)", price: 90, img: "https://via.placeholder.com/80" },
+//   { id: 4, name: "Milk 1L", price: 50, img: "https://via.placeholder.com/80" },
+//   { id: 5, name: "Maggi Noodles", price: 40, img: "https://via.placeholder.com/80" },
+//   { id: 6, name: "Apple (1kg)", price: 150, img: "https://via.placeholder.com/80" },
+//   { id: 7, name: "Bread", price: 35, img: "https://via.placeholder.com/80" },
+//   { id: 8, name: "Banana (1kg)", price: 60, img: "https://via.placeholder.com/80" },
+// ];
 
 export default function SearchPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const initialQuery = location.state?.query || "";
+
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState("");
+  const [trendingProducts, setTrendingProducts] = useState([]);
 
   // ------------------- State Variables -------------------
   const [filteredProducts, setFilteredProducts] = useState([]);
@@ -35,8 +42,49 @@ export default function SearchPage() {
   const [serviceResults, setServiceResults] = useState([]);
   const [emergencyResults, setEmergencyResults] = useState([]);
 
+  // 🔔 Toast
+const [toast, setToast] = useState("");
+
+// ⏳ Disable buttons while API pending
+const [loadingItemId, setLoadingItemId] = useState(null);
+
+// 🏪 Cart merchant tracking
+const cartMerchantId = localStorage.getItem("cartMerchantId");
+const cartMerchantName = localStorage.getItem("cartMerchantName");
+
+// 🔁 Replace cart popup
+const [showReplacePopup, setShowReplacePopup] = useState(false);
+const [pendingItem, setPendingItem] = useState(null);
+
+useEffect(() => {
+  const syncCart = async () => {
+    try {
+      const res = await getCartList({});
+      if (!res?.status) return;
+
+      const syncedItems = (res.items || []).map(i => ({
+        id: i.menu_id || i.product_id,
+        quantity: i.quantity,
+        type: i.type,
+        merchantName: res.merchant?.name,
+      }));
+
+      setCartItems(syncedItems);
+
+      if (res.merchant?.id) {
+        localStorage.setItem("cartMerchantId", String(res.merchant.id));
+        localStorage.setItem("cartMerchantName", res.merchant.name);
+      }
+    } catch (e) {
+      console.error("Cart sync failed", e);
+    }
+  };
+
+  syncCart();
+}, []);
+
   // ------------------- Global Search Data -------------------
-  const storedProducts = JSON.parse(localStorage.getItem("products")) || [];
+  // const storedProducts = JSON.parse(localStorage.getItem("products")) || [];
   const storedMerchants = JSON.parse(localStorage.getItem("merchants")) || [];
   const storedRestaurants = JSON.parse(localStorage.getItem("restaurants")) || [];
 
@@ -57,29 +105,190 @@ export default function SearchPage() {
     "Snake Catcher Vijay",
   ];
 
+  const getQty = (id) =>
+  cartItems.find((i) => i.id === id)?.quantity || 0;
+
+  const increaseQty = async (item) => {
+  const currentMerchantId = String(item.merchant_id || item.merchantName || "");
+  const existingMerchantId = String(
+    localStorage.getItem("cartMerchantId") || ""
+  );
+
+  // 🛑 Block cross-merchant
+  if (
+    cartItems.length > 0 &&
+    existingMerchantId &&
+    existingMerchantId !== currentMerchantId
+  ) {
+    setPendingItem(item);
+    setShowReplacePopup(true);
+    return;
+  }
+
+  const currentQty = getQty(item.id);
+  const newQty = currentQty + 1;
+
+  setLoadingItemId(item.id);
+
+  // Optimistic UI
+  setCartItems(prev =>
+    prev.some(i => i.id === item.id)
+      ? prev.map(i =>
+          i.id === item.id ? { ...i, quantity: newQty } : i
+        )
+      : [...prev, { ...item, quantity: 1 }]
+  );
+
+  try {
+    await addToCartApi({
+      menuIds: item.type === "menu" ? [item.id] : [],
+      productIds: item.type === "product" ? [item.id] : [],
+      quantity: newQty,
+    });
+
+    localStorage.setItem("cartMerchantId", currentMerchantId);
+    localStorage.setItem("cartMerchantName", item.merchantName || "");
+
+    // 🔔 Toast
+    setToast("Added to cart");
+    setTimeout(() => setToast(""), 1500);
+  } finally {
+    setLoadingItemId(null);
+  }
+};
+
+
+const decreaseQty = async (item) => {
+  const currentQty = getQty(item.id);
+  if (currentQty <= 0) return;
+
+  const newQty = currentQty - 1;
+
+  setCartItems((prev) =>
+    newQty === 0
+      ? prev.filter((i) => i.id !== item.id)
+      : prev.map((i) =>
+          i.id === item.id ? { ...i, quantity: newQty } : i
+        )
+  );
+
+  await addToCartApi({
+    menuIds: item.type === "menu" ? [item.id] : [],
+    productIds: item.type === "product" ? [item.id] : [],
+    quantity: newQty,
+  });
+};
+
+// const confirmReplaceCart = async () => {
+//   try {
+//     setCartItems([]);
+//     localStorage.removeItem("cartItems");
+
+//     await goToCartApi(); // backend reset
+
+//     localStorage.setItem(
+//       "cartMerchantId",
+//       String(pendingItem.merchant_id || "")
+//     );
+//     localStorage.setItem(
+//       "cartMerchantName",
+//       pendingItem.merchantName || ""
+//     );
+
+//     setShowReplacePopup(false);
+
+//     if (pendingItem) {
+//       await increaseQty(pendingItem);
+//       setPendingItem(null);
+//     }
+//   } catch (e) {
+//     console.error("Replace cart failed", e);
+//   }
+// };
+
   // ------------------- Search Effect -------------------
   useEffect(() => {
-    if (!searchQuery.trim()) {
+  if (!searchQuery.trim()) {
+    setFilteredProducts([]);
+    setMerchantResults([]);
+    setRestaurantResults([]);
+    setServiceResults([]);
+    setEmergencyResults([]);
+    return;
+  }
+
+  const fetchSearchResults = async () => {
+    try {
+      setLoading(true);
+      setApiError("");
+
+      const res = await searchProductsApi(searchQuery);
+
+     if (res?.status) {
+  const products = res.products || [];
+  const menus = res.menus || [];
+
+  // 🔁 Normalize both into one structure
+  const combinedResults = [
+    ...products.map(p => ({
+      id: p.id,
+      name: p.product_name,
+      price: Number(p.discounted_price || p.product_price),
+      originalPrice: Number(p.product_price),
+      image: p.product_image,
+      type: "product",
+      merchantName: p.merchant_name,
+    })),
+    ...menus.map(m => ({
+      id: m.id,
+      name: m.menu_name,
+      price: Number(m.discounted_price || m.menu_price),
+      originalPrice: Number(m.menu_price),
+      image: m.menu_image,
+      type: "menu",
+      merchantName: m.merchant_name,
+      description: m.menu_description,
+    })),
+  ];
+
+  setFilteredProducts(combinedResults);
+
+  // Save for trending
+  localStorage.setItem(
+    "lastSearchResults",
+    JSON.stringify(combinedResults)
+  );
+}
+
+
+//   // 👇 store last results for trending fallback
+//   localStorage.setItem("lastSearchResults", JSON.stringify(res.data || []));
+// }
+
+
+      // 🔹 Keep these frontend-only
+      const q = searchQuery.toLowerCase();
+      setServiceResults(demoServices.filter((s) => s.toLowerCase().includes(q)));
+      setEmergencyResults(demoEmergency.filter((e) => e.toLowerCase().includes(q)));
+
+    } catch (err) {
+      console.error("Search failed", err);
+      setApiError("Failed to search products");
       setFilteredProducts([]);
-      setMerchantResults([]);
-      setRestaurantResults([]);
-      setServiceResults([]);
-      setEmergencyResults([]);
-      return;
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const q = searchQuery.toLowerCase();
+  fetchSearchResults();
+}, [searchQuery]);
 
-    setFilteredProducts([
-      ...productsList.filter((p) => p.name.toLowerCase().includes(q)),
-      ...storedProducts.filter((p) => p.name.toLowerCase().includes(q)),
-    ]);
-
-    setMerchantResults(storedMerchants.filter((m) => m.name.toLowerCase().includes(q)));
-    setRestaurantResults(storedRestaurants.filter((r) => r.name.toLowerCase().includes(q)));
-    setServiceResults(demoServices.filter((s) => s.toLowerCase().includes(q)));
-    setEmergencyResults(demoEmergency.filter((e) => e.toLowerCase().includes(q)));
-  }, [searchQuery]);
+useEffect(() => {
+  const stored = localStorage.getItem("lastSearchResults");
+  if (stored) {
+    setTrendingProducts(JSON.parse(stored).slice(0, 6));
+  }
+}, []);
 
   // ------------------- Search & Cart Tracking -------------------
   const incrementSearchCount = (productName) => {
@@ -111,22 +320,23 @@ export default function SearchPage() {
   };
 
   // ------------------- Merged Trending & Recommended Products -------------------
-  const getMergedProducts = () => {
-    const searchCounts = JSON.parse(localStorage.getItem("searchCounts") || "{}");
-    const cartCounts = JSON.parse(localStorage.getItem("cartCounts") || "{}");
-    const allProducts = [...productsList, ...storedProducts];
+  // const getMergedProducts = () => {
+  //   const searchCounts = JSON.parse(localStorage.getItem("searchCounts") || "{}");
+  //   const cartCounts = JSON.parse(localStorage.getItem("cartCounts") || "{}");
+  //   const allProducts = [...productsList, ...storedProducts];
 
-    const scoredProducts = allProducts.map((p) => ({
-      ...p,
-      score: (searchCounts[p.name] || 0) + (cartCounts[p.id] || 0),
-    }));
+  //   const scoredProducts = allProducts.map((p) => ({
+  //     ...p,
+  //     score: (searchCounts[p.name] || 0) + (cartCounts[p.id] || 0),
+  //   }));
 
-    scoredProducts.sort((a, b) => b.score - a.score);
+  //   scoredProducts.sort((a, b) => b.score - a.score);
 
-    return scoredProducts.slice(0, 6);
-  };
+  //   return scoredProducts.slice(0, 6);
+  // };
 
-  const mergedProducts = getMergedProducts();
+  // const mergedProducts = getMergedProducts();
+
 
   // ------------------- Add to Cart -------------------
   const addToCart = (product) => {
@@ -200,7 +410,7 @@ export default function SearchPage() {
         </div>
       )}
 
-      {/* Merged Products Grid */}
+      {/* Merged Products Grid
       {!searchQuery && (
         <div className="mt-6 px-4">
           <h2 className="font-bold text-gray-800 text-lg mb-3 flex items-center gap-2">
@@ -230,7 +440,65 @@ export default function SearchPage() {
             ))}
           </div>
         </div>
-      )}
+      )} */}
+
+{!searchQuery && trendingProducts.length > 0 && (
+  <div className="mt-6 px-4">
+    <h2 className="font-bold text-gray-800 text-lg mb-3">
+      🔥 Popular Searches
+    </h2>
+
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {trendingProducts.map((p) => (
+        <motion.div
+          key={p.id}
+          whileTap={{ scale: 0.95 }}
+          className="bg-white rounded-2xl shadow-md p-3 flex flex-col items-center"
+        >
+        <img
+  src={
+    p.image
+      ? `${import.meta.env.VITE_API_BASE_URL}${p.image}`
+      : "/food-placeholder.png"
+  }
+  alt={p.name}
+  className="w-16 h-16 rounded-xl object-cover"
+/>
+
+<span
+  className={`text-xs px-2 py-1 rounded-full font-semibold ${
+    p.type === "menu"
+      ? "bg-orange-100 text-orange-700"
+      : "bg-blue-100 text-blue-700"
+  }`}
+>
+  {p.type === "menu" ? "🍽️ Dish" : "🛒 Product"}
+</span>
+
+          <h3 className="text-sm mt-2 text-center">{p.name}</h3>
+          <p className="text-orange-600 font-semibold">
+            ₹{p.price || p.unit_price}
+          </p>
+          {getQty(p.id) === 0 ? (
+  <button
+    onClick={() => increaseQty(p)}
+    className="bg-orange-500 text-white px-3 py-1 rounded-lg text-xs"
+  >
+    ADD
+  </button>
+) : (
+  <div className="flex items-center gap-2 bg-orange-100 rounded-lg px-2 py-1">
+    <button onClick={() => decreaseQty(p)}>−</button>
+    <span>{getQty(p.id)}</span>
+    <button onClick={() => increaseQty(p)}>+</button>
+  </div>
+)}
+
+        </motion.div>
+      ))}
+    </div>
+  </div>
+)}
 
       {/* Search Results / Emergency */}
       <div className="flex-1 p-4 space-y-3 overflow-y-auto">
@@ -255,22 +523,58 @@ export default function SearchPage() {
             exit={{ opacity: 0, y: 10 }}
           >
             <img
-              src={product.img}
-              alt={product.name}
-              className="w-16 h-16 rounded-xl object-cover border border-orange-100"
-            />
+            src={product.image || "/food-placeholder.png"}
+            alt={product.name}
+            className="w-16 h-16 rounded-xl object-cover"
+          />
+
+          <p className="text-orange-600 font-semibold">
+            ₹{product.price || product.unit_price}
+          </p>
+
             <div className="flex-1">
               <h3 className="font-semibold text-gray-800">{product.name}</h3>
-              <p className="text-orange-600 font-semibold">₹{product.price}</p>
             </div>
-            <button
-              onClick={() => addToCart(product)}
-              className="bg-orange-400 text-white px-4 py-2 rounded-2xl hover:bg-orange-500 transition flex items-center gap-1"
-            >
-              <ShoppingCart className="w-4 h-4" /> Add
-            </button>
+            <div className="flex items-center gap-2">
+            {getQty(product.id) === 0 ? (
+              <button
+                onClick={() => increaseQty(product)}
+                className="bg-orange-500 text-white px-4 py-1 rounded-xl text-sm font-semibold"
+              >
+                ADD
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 bg-orange-100 rounded-xl px-2 py-1">
+                <button
+                  onClick={() => decreaseQty(product)}
+                  className="px-2 font-bold text-orange-600"
+                >
+                  −
+                </button>
+
+                <span className="font-semibold">{getQty(product.id)}</span>
+
+                <button
+                  onClick={() => increaseQty(product)}
+                  className="px-2 font-bold text-orange-600"
+                >
+                  +
+                </button>
+              </div>
+            )}
+          </div>
           </motion.div>
         ))}
+{loading && (
+  <div className="text-center mt-10 text-gray-500">
+    Searching for “{searchQuery}”…
+  </div>
+)}
+{apiError && (
+  <div className="text-center mt-10 text-red-500 font-semibold">
+    {apiError}
+  </div>
+)}
 
         {/* Emergency Section */}
         {emergencyResults.length > 0 && (
@@ -312,6 +616,78 @@ export default function SearchPage() {
           </button>
         </div>
       )}
+
+      {toast && (
+  <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-black text-white px-4 py-2 rounded-xl shadow-lg z-50">
+    {toast}
+  </div>
+)}
+
+{showReplacePopup && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="bg-white rounded-2xl p-6 w-[90%] max-w-sm shadow-xl text-center">
+      <h3 className="text-lg font-bold mb-2">
+        Items already in cart
+      </h3>
+
+      <p className="text-sm text-gray-600 mb-6">
+        Your cart contains items from{" "}
+        <span className="font-semibold">
+          {cartMerchantName || "another store"}
+        </span>.
+        <br />
+        Please complete or clear your cart before adding items from a new store.
+      </p>
+
+      <button
+        onClick={() => {
+          setShowReplacePopup(false);
+          setPendingItem(null);
+        }}
+        className="w-full py-2 rounded-xl bg-orange-500 text-white font-semibold"
+      >
+        OKay
+      </button>
+    </div>
+  </div>
+)}
+
+
+{/* {showReplacePopup && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="bg-white rounded-2xl p-6 w-[90%] max-w-sm shadow-xl">
+      <h3 className="text-lg font-bold mb-2">
+        Replace cart items?
+      </h3>
+
+      <p className="text-sm text-gray-600 mb-6">
+        Your cart contains items from{" "}
+        <span className="font-semibold">
+          {cartMerchantName || "another store"}
+        </span>.
+        <br />
+        Do you want to replace it?
+      </p>
+
+      <div className="flex gap-3">
+        <button
+          onClick={() => setShowReplacePopup(false)}
+          className="flex-1 py-2 rounded-xl bg-gray-100 text-gray-700 font-semibold"
+        >
+          No
+        </button>
+
+        <button
+          onClick={confirmReplaceCart}
+          className="flex-1 py-2 rounded-xl bg-orange-500 text-white font-semibold"
+        >
+          Yes
+        </button>
+      </div>
+    </div>
+  </div>
+)} */}
+
     </div>
   );
 }

@@ -1,9 +1,16 @@
 // src/pages/RestaurantPage.jsx
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
 import { motion } from "framer-motion";
 import ShimmerLoader from "../components/ShimmerLoader";
+import { getMerchantMenu } from "../services/merchantMenuApi";
+import {
+  addToCartApi,
+  updateCartApi,
+  goToCartApi,
+} from "../services/cartApi";
 
 /*
   RestaurantPage.jsx
@@ -33,6 +40,12 @@ export default function RestaurantPage() {
   const [vegOnlyFilter, setVegOnlyFilter] = useState("All"); // All / Veg / NonVeg
   const [sortBy, setSortBy] = useState("recommended");
 
+  const [showReplacePopup, setShowReplacePopup] = useState(false);
+  const [pendingItem, setPendingItem] = useState(null);
+
+  const cartMerchantId = localStorage.getItem("cartMerchantId");
+  const cartMerchantName = localStorage.getItem("cartMerchantName");
+
   // cart (persisted in localStorage)
   const [cart, setCart] = useState(() => {
     try {
@@ -42,6 +55,17 @@ export default function RestaurantPage() {
     }
   });
 
+  // ✅ KEEP CART SYNCED WITH LOCAL STORAGE
+useEffect(() => {
+  localStorage.setItem("cartItems", JSON.stringify(cart));
+}, [cart]);
+
+
+
+  const getCartItem = (menuId) => {
+  return cart.find(c => c.id === menuId);
+};
+
   // item detail modal
   const [detailItem, setDetailItem] = useState(null);
 
@@ -49,179 +73,239 @@ export default function RestaurantPage() {
   const categoryRefs = useRef({});
 
   // ---------- Demo data ----------
-  const demoRestaurants = useMemo(() => {
-    return {
-      "1": {
-        id: "1",
-        name: "Velvet Scoops",
-        banner:
-          "https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&fit=crop&w=1400&q=80",
-        rating: 4.8,
-        time: 25,
-        distance: 1.2,
-        vegOnly: false,
-      },
-      "2": {
-        id: "2",
-        name: "Green Leaf Cafe",
-        banner:
-          "https://images.unsplash.com/photo-1541542684-7a6ce36f4f12?auto=format&fit=crop&w=1400&q=80",
-        rating: 4.6,
-        time: 20,
-        distance: 0.8,
-        vegOnly: true,
-      },
-      "3": {
-        id: "3",
-        name: "Wakhari Bhojan",
-        banner:
-          "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1400&q=80",
-        rating: 4.7,
-        time: 18,
-        distance: 0.5,
-        vegOnly: false,
-      },
-      default: {
-        id: "0",
-        name: "Demo Restaurant",
-        banner: demoUploadedImage,
-        rating: 4.2,
-        time: 30,
-        distance: 1.5,
-        vegOnly: false,
-      },
-    };
-  }, []);
-
-  const demoMenus = useMemo(() => {
-    // Each restaurant has categories with items
-    return {
-      "1": {
-        categories: [
-          {
-            id: "recommended",
-            name: "Recommended",
-            items: [
-              { id: "1_1", name: "Chocolate Ice Cream", price: 120, veg: true, img: demoUploadedImage, rating: 4.8, desc: "Rich chocolate ice cream topped with choco chips." },
-              { id: "1_2", name: "Belgian Waffle", price: 150, veg: true, img: demoUploadedImage, rating: 4.6, desc: "Crispy waffles with maple syrup." },
-              { id: "1_7", name: "Brownie Sundae", price: 210, veg: true, img: demoUploadedImage, rating: 4.7, desc: "Warm brownie with vanilla ice cream." },
-              { id: "1_8", name: "Fruit Bowl", price: 130, veg: true, img: demoUploadedImage, rating: 4.5, desc: "Seasonal fruits with honey." },
-              { id: "1_9", name: "Cookie Shake", price: 140, veg: true, img: demoUploadedImage, rating: 4.4, desc: "Creamy milkshake with crushed cookies." },
-              { id: "1_10", name: "Nutella Crepe", price: 160, veg: true, img: demoUploadedImage, rating: 4.5, desc: "Thin crepe filled with Nutella." },
-            ],
-          },
-          {
-            id: "sundaes",
-            name: "Sundaes & Bowls",
-            items: [
-              { id: "1_3", name: "Strawberry Sundae", price: 180, veg: true, img: demoUploadedImage, rating: 4.5, desc: "Fresh strawberry, cream & syrup." },
-              { id: "1_4", name: "Brownie Delight", price: 200, veg: true, img: demoUploadedImage, rating: 4.7, desc: "Brownie with scoop of ice cream." },
-            ],
-          },
-          {
-            id: "beverages",
-            name: "Beverages",
-            items: [
-              { id: "1_5", name: "Cold Coffee", price: 90, veg: true, img: demoUploadedImage, rating: 4.2, desc: "Iced coffee with cream." },
-              { id: "1_6", name: "Milkshake", price: 130, veg: true, img: demoUploadedImage, rating: 4.3, desc: "Creamy milkshake." },
-            ],
-          },
-        ],
-      },
-
-      "2": {
-        categories: [
-          {
-            id: "recommended",
-            name: "Recommended",
-            items: [
-              { id: "2_1", name: "Herb Paneer Sandwich", price: 160, veg: true, img: demoUploadedImage, rating: 4.6, desc: "Paneer with herbs grilled." },
-              { id: "2_4", name: "Avocado Toast", price: 170, veg: true, img: demoUploadedImage, rating: 4.5, desc: "Whole grain toast with avocado." },
-            ],
-          },
-          {
-            id: "breakfast",
-            name: "Breakfast",
-            items: [
-              { id: "2_2", name: "Idli Sambar", price: 90, veg: true, img: demoUploadedImage, rating: 4.4, desc: "Soft idlis with sambar." },
-              { id: "2_3", name: "Pancakes", price: 120, veg: true, img: demoUploadedImage, rating: 4.3, desc: "Fluffy pancakes with syrup." },
-            ],
-          },
-        ],
-      },
-
-      "3": {
-        categories: [
-          {
-            id: "recommended",
-            name: "Recommended",
-            items: [
-              { id: "3_1", name: "Wakhari Thali (Non-Veg)", price: 240, veg: false, img: demoUploadedImage, rating: 4.5, desc: "Local thali with sides." },
-              { id: "3_2", name: "Veg Thali", price: 200, veg: true, img: demoUploadedImage, rating: 4.4, desc: "Vegetarian thali with rotis." },
-            ],
-          },
-          {
-            id: "mains",
-            name: "Mains",
-            items: [
-              { id: "3_3", name: "Masala Fish", price: 260, veg: false, img: demoUploadedImage, rating: 4.2, desc: "Spicy masala fried fish." },
-            ],
-          },
-        ],
-      },
-    };
-  }, []);
-
+   
   // ---------- Load restaurant + menu ----------
   useEffect(() => {
-    setLoading(true);
-    const t = setTimeout(() => {
-      const rest = demoRestaurants[id] || demoRestaurants.default;
-      const menu = demoMenus[id] || demoMenus["1"];
-      // default open category = recommended
-      setRestaurantData({ ...rest, menu });
-      setOpenCategory("recommended");
+  const fetchMenu = async () => {
+    try {
+      setLoading(true);
+
+      const res = await getMerchantMenu(id);
+
+      if (!res.status) {
+        alert("Failed to load menu");
+        return;
+      }
+
+      // 🔁 Backend → UI mapping
+      const categories = [
+  {
+    id: "recommended",
+    name: "Recommended",
+    items: res.data.map((item) => ({
+      id: item.menu_id,
+      name: item.menu_name,
+     price: Number(item.discounted_price || item.menu_price),
+      originalPrice: Number(item.menu_price),
+      hasDiscount:
+      item.discounted_price &&
+      Number(item.discounted_price) < Number(item.menu_price),
+      veg: item.is_veg,
+      rating: 0,
+      desc: item.menu_description || "",
+      img:
+      item.menu_image && item.menu_image.trim() !== ""
+        ? `${import.meta.env.VITE_API_BASE_URL}${item.menu_image}`
+        : demoUploadedImage,
+      label: item.label, // optional future use
+        })),
+      },
+    ];
+
+      setRestaurantData({
+        id,
+        name: "Restaurant",
+        rating: 4.2,
+        time: 30,
+        distance: "-",
+        banner: "https://images.unsplash.com/photo-1544025162-d76694265947",
+        menu: { categories },
+      });
+
+
+      // open Recommended if exists
+      const hasRecommended = categories.find(
+        (c) => c.id === "recommended"
+      );
+      setOpenCategory(hasRecommended ? "recommended" : categories[0]?.id);
+
+    } catch (err) {
+      console.error(err);
+      alert("Server error while loading menu");
+    } finally {
       setLoading(false);
-      // prepare refs
-      (menu.categories || []).forEach(c => (categoryRefs.current[c.id] = categoryRefs.current[c.id] || React.createRef()));
-    }, 400);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+    }
+  };
+
+  fetchMenu();
+}, [id]);
+
 
   // persist cart to localStorage
   useEffect(() => {
-    localStorage.setItem("cartItems", JSON.stringify(cart));
+    const cartCount = cart.reduce((s, it) => s + it.quantity, 0);
   }, [cart]);
 
-  // cart helpers
-  const addToCart = (item) => {
-    setCart(prev => {
-      const found = prev.find(p => p.id === item.id);
-      if (found) {
-        return prev.map(p => p.id === item.id ? { ...p, quantity: p.quantity + 1 } : p);
-      }
-      return [...prev, { ...item, quantity: 1 }];
-    });
-  };
+  const syncCartUI = (itemId, delta) => {
+  setCart(prev => {
+    const found = prev.find(p => p.id === itemId);
 
-  const removeOne = (item) => {
-    setCart(prev => {
-      const found = prev.find(p => p.id === item.id);
-      if (!found) return prev;
-      if (found.quantity <= 1) return prev.filter(p => p.id !== item.id);
-      return prev.map(p => p.id === item.id ? { ...p, quantity: p.quantity - 1 } : p);
+    if (!found && delta > 0) {
+      return [...prev, { id: itemId, quantity: delta }];
+    }
+
+    if (!found) return prev;
+
+    const newQty = found.quantity + delta;
+
+    if (newQty <= 0) {
+      return prev.filter(p => p.id !== itemId);
+    }
+
+    return prev.map(p =>
+      p.id === itemId ? { ...p, quantity: newQty } : p
+    );
+  });
+};
+
+const goToCart = async () => {
+  const selected =
+    JSON.parse(localStorage.getItem("selectedAddress")) ||
+    JSON.parse(localStorage.getItem("defaultAddress"));
+
+  if (!selected?.address_id) {
+    alert("Please add delivery address first");
+    navigate("/address");
+    return;
+  }
+
+  try {
+    const res = await goToCartApi();
+
+    if (!res.status) {
+      alert("Unable to open cart");
+      return;
+    }
+
+    // 🔐 Store cart snapshot (optional but recommended)
+    localStorage.setItem(
+      "activeCart",
+      JSON.stringify({
+        cart_id: res.cart_id,
+        merchant: res.merchant,
+        summary: res.summary,
+      })
+    );
+
+    navigate("/cart");
+  } catch (err) {
+    console.error("Go to cart failed", err);
+    alert("Unable to open cart. Try again.");
+  }
+};
+
+
+const addToCart = async (item) => {
+  const currentRestaurantId = String(id); // ✅ normalize
+  const existingMerchantId = String(
+    localStorage.getItem("cartMerchantId") || ""
+  );
+
+  // 🛑 Show popup ONLY if cart belongs to ANOTHER restaurant
+  if (
+    cart.length > 0 &&
+    existingMerchantId &&
+    existingMerchantId !== currentRestaurantId
+  ) {
+    setPendingItem(item);
+    setShowReplacePopup(true);
+    return;
+  }
+
+  const currentQty = quantityOf(item.id);
+
+  try {
+    syncCartUI(item.id, 1);
+
+    await addToCartApi({
+      menuIds: [item.id],
+      productIds: [],
+      quantity: currentQty + 1,
     });
-  };
+
+    // ✅ Save merchant id ONCE and consistently
+    localStorage.setItem("cartMerchantId", currentRestaurantId);
+    localStorage.setItem("cartMerchantName", restaurantData.name);
+  } catch (err) {
+    syncCartUI(item.id, -1);
+    alert("Failed to add item");
+  }
+};
+
+useEffect(() => {
+  if (cart.length === 0) {
+    localStorage.removeItem("cartMerchantId");
+    localStorage.removeItem("cartMerchantName");
+  }
+}, [cart]);
+
+
+const confirmReplaceCart = async () => {
+  try {
+    // 🔥 Clear frontend cart
+    setCart([]);
+    localStorage.removeItem("cartItems");
+
+    // 🔥 Clear backend cart
+    await goToCartApi(); // backend resets cart session
+
+    // 🔥 Reset merchant
+    localStorage.setItem("cartMerchantId", id);
+    localStorage.setItem("cartMerchantName", restaurantData.name);
+
+    setShowReplacePopup(false);
+
+    // 🔁 Add item after clearing
+    if (pendingItem) {
+      await addToCart(pendingItem);
+      setPendingItem(null);
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Failed to replace cart");
+  }
+};
+
+const cancelReplaceCart = () => {
+  setShowReplacePopup(false);
+  setPendingItem(null);
+};
+
+
+const removeOne = async (item) => {
+  const currentQty = quantityOf(item.id);
+  if (currentQty <= 0) return;
+
+  try {
+    syncCartUI(item.id, -1);
+
+    await addToCartApi({
+      menuIds: [item.id],
+      productIds: [],
+      quantity: currentQty - 1,
+    });
+  } catch (err) {
+    syncCartUI(item.id, 1); // rollback
+    alert("Failed to update item");
+  }
+};
+
 
   const quantityOf = (itemId) => {
     const it = cart.find(c => c.id === itemId);
     return it ? it.quantity : 0;
   };
 
-  const goToCart = () => {
-    navigate("/cart");
-  };
 
   // filtered categories & items according to search/filter/sort
   const filteredCategories = useMemo(() => {
@@ -271,7 +355,19 @@ export default function RestaurantPage() {
   }
 
   const cartCount = cart.reduce((s, it) => s + (it.quantity || 0), 0);
-  const cartTotal = cart.reduce((s, it) => s + (it.price || 0) * (it.quantity || 1), 0);
+  const cartTotal = cart.reduce((s, it) => s + it.quantity, 0);
+
+
+  const getDiscountPercent = (item) => {
+  if (!item.hasDiscount) return 0;
+
+  const percent =
+    ((item.originalPrice - item.price) / item.originalPrice) * 100;
+
+  // cap at 90% for UI (backend still controls pricing)
+  return Math.min(90, Math.round(percent));
+};
+
 
   return (
     <div className="min-h-screen bg-[#FFF7ED] pb-32">
@@ -325,14 +421,48 @@ export default function RestaurantPage() {
           <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar">
             {recommendedStrip.map(item => (
               <div key={item.id} className="min-w-[220px] bg-white rounded-xl shadow p-3 flex flex-col gap-2">
-                <img src={item.img || demoUploadedImage} alt={item.name} className="w-full h-32 object-cover rounded-lg" />
+                <div className="relative">
+                <img
+                  src={item.img || demoUploadedImage}
+                  alt={item.name}
+                  className="w-full h-32 object-cover rounded-lg"
+                />
+
+                {item.hasDiscount && (
+                  <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow">
+                    🔥 {getDiscountPercent(item)}% OFF
+                  </span>
+                )}
+              </div>
                 <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-sm">{item.name}</h4>
-                    <span className="text-xs text-gray-500">₹{item.price}</span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.desc}</p>
+                {/* Item Name */}
+                <h4 className="font-semibold text-sm truncate">
+                  {item.name}
+                </h4>
+
+                {/* Price */}
+                <div className="text-xs mt-1">
+                  {item.hasDiscount ? (
+                    <>
+                      <span className="line-through text-gray-400 mr-1">
+                        ₹{item.originalPrice}
+                      </span>
+                      <span className="text-orange-600 font-semibold">
+                        ₹{item.price}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-gray-700 font-semibold">
+                      ₹{item.price}
+                    </span>
+                  )}
                 </div>
+
+                {/* Description */}
+                <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                  {item.desc}
+                </p>
+              </div>
 
                 <div className="flex items-center gap-2">
                   <button
@@ -377,7 +507,9 @@ export default function RestaurantPage() {
             </div>
           </div>
         ) : (
-          filteredCategories.map(cat => {
+                  filteredCategories
+          .filter(cat => cat.id !== "recommended")
+          .map(cat => {
             const isOpen = openCategory === cat.id;
             return (
               <div key={cat.id} className="mb-4">
@@ -486,6 +618,52 @@ export default function RestaurantPage() {
           </div>
         </div>
       </div>
+
+      {showReplacePopup && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="bg-white rounded-2xl p-6 w-[90%] max-w-sm shadow-xl relative">
+      <button
+        onClick={cancelReplaceCart}
+        className="absolute top-3 right-3 text-gray-400 text-xl"
+      >
+        ✕
+      </button>
+
+      <h3 className="text-lg font-bold mb-2">
+        Replace cart item?
+      </h3>
+
+      <p className="text-sm text-gray-600 mb-6">
+        Your cart contains dishes from{" "}
+        <span className="font-semibold">
+          {cartMerchantName || "another restaurant"}
+        </span>.
+        <br />
+        Do you want to discard the selection and add dishes from{" "}
+        <span className="font-semibold">
+          {restaurantData.name}
+        </span>?
+      </p>
+
+      <div className="flex gap-3">
+        <button
+          onClick={cancelReplaceCart}
+          className="flex-1 py-2 rounded-xl bg-orange-100 text-orange-600 font-semibold"
+        >
+          okay
+        </button>
+
+        {/* <button
+          onClick={confirmReplaceCart}
+          className="flex-1 py-2 rounded-xl bg-orange-500 text-white font-semibold"
+        >
+          Yes
+        </button> */}
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }

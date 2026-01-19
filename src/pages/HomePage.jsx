@@ -8,6 +8,8 @@ import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import { Heart } from "lucide-react";
 import { useFavorites } from "../context/FavoritesContext";
+import { getAccessToken } from "../utils/auth";
+import { getRestaurantList } from "../services/homeApi";
 
 
 export default function HomePage() {
@@ -94,92 +96,139 @@ const { favorites, addFavorite, removeFavorite } = useFavorites();
     setFilteredRestaurants(filtered);
   }, [searchText, filter, nearbyRestaurants]);
 
-  // initial demo restaurants load
   useEffect(() => {
-    updateCartCount();
+  const fetchRestaurants = async () => {
+    try {
+      setLoading(true);
+      updateCartCount();
 
-    // generate demo restaurants (counts as requested)
-    const demo = [];
-
-    // Helper to push restaurant objects
-    const pushR = (id, name, location, distance, isVeg, price, time, rating, img) => {
-      demo.push({
-        id,
-        name,
-        location,
-        distance, // km
-        isVeg,
-        price,
-        time,
-        rating,
-        img,
+      const res = await getRestaurantList({
+        search: searchLocation || "",
+        food:
+          filter === "Pure Veg"
+            ? "veg"
+            : filter === "Non-Veg"
+            ? "non_veg"
+            : "",
       });
-    };
 
-    // Vasind (4: 2 veg, 2 non-veg)
-    pushR(1, "Velvet Scoops", "Vasind", 1.2, true, 100, "25 min", "4.9★", "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?auto=format&fit=crop&w=800&q=60");
-    pushR(2, "Green Leaf Cafe", "Vasind", 0.8, true, 150, "20 min", "4.6★", "https://images.unsplash.com/photo-1541542684-7a6ce36f4f12?auto=format&fit=crop&w=800&q=60");
-    pushR(3, "Vasind Katta", "Vasind", 2.1, false, 200, "30 min", "4.3★", "https://images.unsplash.com/photo-1606755962773-d32446d3b17b?auto=format&fit=crop&w=800&q=60");
-    pushR(4, "Hyderabadi Biryani Vasind", "Vasind", 3.2, false, 220, "35 min", "4.5★", "https://images.unsplash.com/photo-1590080875832-6a4c0b8d7f8d?auto=format&fit=crop&w=800&q=60");
+      if (res.status) {
+        const formatted = res.data.map((r) => ({
+          id: r.merchant_id,
+          name: r.name,
+          location: r.city || "Nearby",
+          distance: "-",
+          isVeg: r.food === "veg",
+          price: "-",
+          time: "-",
+          rating: "-",
+          img:
+            r.logo ||
+            "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?auto=format&fit=crop&w=800&q=60",
+        }));
 
-    // Wakhari (7: 4 veg, 3 non-veg)
-    pushR(5, "Wakhari Bhojan", "Wakhari", 0.5, true, 120, "18 min", "4.7★", "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=60");
-    pushR(6, "Spice Villa Wakhari", "Wakhari", 1.1, false, 210, "28 min", "4.4★", "https://images.unsplash.com/photo-1551782450-a2132b4ba21d?auto=format&fit=crop&w=800&q=60");
-    pushR(7, "Wakhari Sweets", "Wakhari", 0.9, true, 80, "15 min", "4.5★", "https://images.unsplash.com/photo-1604908813167-d9d98eeeb8b7?auto=format&fit=crop&w=800&q=60");
-    pushR(8, "Urban Dhaba", "Wakhari", 2.2, false, 180, "32 min", "4.2★", "https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=800&q=60");
-    pushR(9, "Green Bowl", "Wakhari", 1.8, true, 140, "25 min", "4.6★", "https://images.unsplash.com/photo-1543352634-4b38b2f5a1c6?auto=format&fit=crop&w=800&q=60");
-    pushR(10, "Noodle House", "Wakhari", 2.5, false, 160, "30 min", "4.1★", "https://images.unsplash.com/photo-1544025162-3a9f1f4d5d1a?auto=format&fit=crop&w=800&q=60");
-    pushR(11, "Cafe Sunrise", "Wakhari", 0.7, true, 110, "16 min", "4.8★", "https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?auto=format&fit=crop&w=800&q=60");
-
-    // Shahapur (2: 1 veg, 1 non-veg)
-    pushR(12, "Shahapur Bites", "Shahapur", 1.5, false, 190, "30 min", "4.2★", "https://images.unsplash.com/photo-1526318472351-c75fcf070d4b?auto=format&fit=crop&w=800&q=60");
-    pushR(13, "Shahapur Sweets", "Shahapur", 0.9, true, 70, "12 min", "4.4★", "https://images.unsplash.com/photo-1542144582-1ba0046a4a4b?auto=format&fit=crop&w=800&q=60");
-
-    // Deola (30: 18 veg, 12 non-veg) - demo names generated
-    let idCounter = 14;
-    const deolaNamesVeg = [
-      "Deola Dhaba", "Deola Green", "Deola Sweets", "Deola Tiffins", "Deola Juice Corner",
-      "Veggie Delight Deola", "Deola Bakers", "Deola Idli House", "Deola South Kitchen", "Deola Dosa Point",
-      "Deola Thali House", "Deola Chana Bhatura", "Deola Salad Bar", "Deola Paratha Corner", "Deola Falafel",
-      "Deola Coffee Bar", "Deola Wraps", "Deola Pancake Co"
-    ];
-    const deolaNamesNonVeg = [
-      "Deola Biryani Hub", "Deola Chicken Corner", "Deola Grill", "Deola Fish Fry", "Deola Kebab Place",
-      "Deola NonVeg Dhaba", "Deola Taste", "Deola Tandoor", "Deola Seafood", "Deola Express",
-      "Deola Curry House", "Deola Roast"
-    ];
-    deolaNamesVeg.forEach((n, idx) => {
-      pushR(idCounter++, n, "Deola", 1 + (idx % 6) * 0.4, true, 120 + (idx % 5) * 10, `${20 + (idx % 4)} min`, `${4.0 + (idx % 5) * 0.1}★`, "https://images.unsplash.com/photo-1543352634-4b38b2f5a1c6?auto=format&fit=crop&w=800&q=60");
-    });
-    deolaNamesNonVeg.forEach((n, idx) => {
-      pushR(idCounter++, n, "Deola", 0.8 + (idx % 7) * 0.5, false, 160 + (idx % 6) * 15, `${25 + (idx % 6)} min`, `${4.1 + (idx % 4) * 0.1}★`, "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?auto=format&fit=crop&w=800&q=60");
-    });
-
-    // (Thane,Nashik none => none added)
-
-    setRestaurants(demo);
-
-    // if user already selected searchedLocation, apply filter
-    const storedSearch = (localStorage.getItem("searchedLocation") || "").trim();
-    if (storedSearch) {
-      const nearby = demo.filter(r => r.location.toLowerCase() === storedSearch.toLowerCase());
-      setNearbyRestaurants(nearby);
-    } else {
-      // If GPS present, pick Vasind demo as default nearby (for demo)
-      const lat = localStorage.getItem("userLat");
-      const lng = localStorage.getItem("userLng");
-      if (lat && lng) {
-        const nearby = demo.filter(r => r.location === "Vasind");
-        setNearbyRestaurants(nearby);
-      } else {
-        // default to Vasind nearby (so someone sees something)
-        const nearby = demo.filter(r => r.location === "Vasind");
-        setNearbyRestaurants(nearby);
+        setRestaurants(formatted);
+        setNearbyRestaurants(formatted);
       }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to load restaurants");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setLoading(false);
-  }, []);
+  fetchRestaurants();
+}, [searchLocation, filter]);
+
+
+
+  // // initial demo restaurants load
+  // useEffect(() => {
+  //   updateCartCount();
+
+  //   // generate demo restaurants (counts as requested)
+  //   const demo = [];
+
+  //   // Helper to push restaurant objects
+  //   const pushR = (id, name, location, distance, isVeg, price, time, rating, img) => {
+  //     demo.push({
+  //       id,
+  //       name,
+  //       location,
+  //       distance, // km
+  //       isVeg,
+  //       price,
+  //       time,
+  //       rating,
+  //       img,
+  //     });
+  //   };
+
+  //   // Vasind (4: 2 veg, 2 non-veg)
+  //   pushR(1, "Velvet Scoops", "Vasind", 1.2, true, 100, "25 min", "4.9★", "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?auto=format&fit=crop&w=800&q=60");
+  //   pushR(2, "Green Leaf Cafe", "Vasind", 0.8, true, 150, "20 min", "4.6★", "https://images.unsplash.com/photo-1541542684-7a6ce36f4f12?auto=format&fit=crop&w=800&q=60");
+  //   pushR(3, "Vasind Katta", "Vasind", 2.1, false, 200, "30 min", "4.3★", "https://images.unsplash.com/photo-1606755962773-d32446d3b17b?auto=format&fit=crop&w=800&q=60");
+  //   pushR(4, "Hyderabadi Biryani Vasind", "Vasind", 3.2, false, 220, "35 min", "4.5★", "https://images.unsplash.com/photo-1590080875832-6a4c0b8d7f8d?auto=format&fit=crop&w=800&q=60");
+
+  //   // Wakhari (7: 4 veg, 3 non-veg)
+  //   pushR(5, "Wakhari Bhojan", "Wakhari", 0.5, true, 120, "18 min", "4.7★", "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=60");
+  //   pushR(6, "Spice Villa Wakhari", "Wakhari", 1.1, false, 210, "28 min", "4.4★", "https://images.unsplash.com/photo-1551782450-a2132b4ba21d?auto=format&fit=crop&w=800&q=60");
+  //   pushR(7, "Wakhari Sweets", "Wakhari", 0.9, true, 80, "15 min", "4.5★", "https://images.unsplash.com/photo-1604908813167-d9d98eeeb8b7?auto=format&fit=crop&w=800&q=60");
+  //   pushR(8, "Urban Dhaba", "Wakhari", 2.2, false, 180, "32 min", "4.2★", "https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=800&q=60");
+  //   pushR(9, "Green Bowl", "Wakhari", 1.8, true, 140, "25 min", "4.6★", "https://images.unsplash.com/photo-1543352634-4b38b2f5a1c6?auto=format&fit=crop&w=800&q=60");
+  //   pushR(10, "Noodle House", "Wakhari", 2.5, false, 160, "30 min", "4.1★", "https://images.unsplash.com/photo-1544025162-3a9f1f4d5d1a?auto=format&fit=crop&w=800&q=60");
+  //   pushR(11, "Cafe Sunrise", "Wakhari", 0.7, true, 110, "16 min", "4.8★", "https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?auto=format&fit=crop&w=800&q=60");
+
+  //   // Shahapur (2: 1 veg, 1 non-veg)
+  //   pushR(12, "Shahapur Bites", "Shahapur", 1.5, false, 190, "30 min", "4.2★", "https://images.unsplash.com/photo-1526318472351-c75fcf070d4b?auto=format&fit=crop&w=800&q=60");
+  //   pushR(13, "Shahapur Sweets", "Shahapur", 0.9, true, 70, "12 min", "4.4★", "https://images.unsplash.com/photo-1542144582-1ba0046a4a4b?auto=format&fit=crop&w=800&q=60");
+
+  //   // Deola (30: 18 veg, 12 non-veg) - demo names generated
+  //   let idCounter = 14;
+  //   const deolaNamesVeg = [
+  //     "Deola Dhaba", "Deola Green", "Deola Sweets", "Deola Tiffins", "Deola Juice Corner",
+  //     "Veggie Delight Deola", "Deola Bakers", "Deola Idli House", "Deola South Kitchen", "Deola Dosa Point",
+  //     "Deola Thali House", "Deola Chana Bhatura", "Deola Salad Bar", "Deola Paratha Corner", "Deola Falafel",
+  //     "Deola Coffee Bar", "Deola Wraps", "Deola Pancake Co"
+  //   ];
+  //   const deolaNamesNonVeg = [
+  //     "Deola Biryani Hub", "Deola Chicken Corner", "Deola Grill", "Deola Fish Fry", "Deola Kebab Place",
+  //     "Deola NonVeg Dhaba", "Deola Taste", "Deola Tandoor", "Deola Seafood", "Deola Express",
+  //     "Deola Curry House", "Deola Roast"
+  //   ];
+  //   deolaNamesVeg.forEach((n, idx) => {
+  //     pushR(idCounter++, n, "Deola", 1 + (idx % 6) * 0.4, true, 120 + (idx % 5) * 10, `${20 + (idx % 4)} min`, `${4.0 + (idx % 5) * 0.1}★`, "https://images.unsplash.com/photo-1543352634-4b38b2f5a1c6?auto=format&fit=crop&w=800&q=60");
+  //   });
+  //   deolaNamesNonVeg.forEach((n, idx) => {
+  //     pushR(idCounter++, n, "Deola", 0.8 + (idx % 7) * 0.5, false, 160 + (idx % 6) * 15, `${25 + (idx % 6)} min`, `${4.1 + (idx % 4) * 0.1}★`, "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?auto=format&fit=crop&w=800&q=60");
+  //   });
+
+  //   // (Thane,Nashik none => none added)
+
+  //   setRestaurants(demo);
+
+  //   // if user already selected searchedLocation, apply filter
+  //   const storedSearch = (localStorage.getItem("searchedLocation") || "").trim();
+  //   if (storedSearch) {
+  //     const nearby = demo.filter(r => r.location.toLowerCase() === storedSearch.toLowerCase());
+  //     setNearbyRestaurants(nearby);
+  //   } else {
+  //     // If GPS present, pick Vasind demo as default nearby (for demo)
+  //     const lat = localStorage.getItem("userLat");
+  //     const lng = localStorage.getItem("userLng");
+  //     if (lat && lng) {
+  //       const nearby = demo.filter(r => r.location === "Vasind");
+  //       setNearbyRestaurants(nearby);
+  //     } else {
+  //       // default to Vasind nearby (so someone sees something)
+  //       const nearby = demo.filter(r => r.location === "Vasind");
+  //       setNearbyRestaurants(nearby);
+  //     }
+  //   }
+
+  //   setLoading(false);
+  // }, []);
 
   // when user searches a locality in the modal
   const handleSearchLocation = () => {
@@ -258,6 +307,13 @@ const { favorites, addFavorite, removeFavorite } = useFavorites();
   const storedSearched = (localStorage.getItem("searchedLocation") || "").trim();
   const displayLocation = storedSearched || (locationGranted ? "Current GPS" : "");
 
+  useEffect(() => {
+    if (!getAccessToken()) {
+      navigate("/");
+    }
+  }, []);
+
+  
   return (
     <div className="min-h-screen bg-[#FFF7ED] flex flex-col relative">
       {/* ---------- Header ---------- */}
@@ -374,12 +430,12 @@ const { favorites, addFavorite, removeFavorite } = useFavorites();
 
             {/* Search restaurants */}
             <input
-              type="text"
-              placeholder="Search restaurant..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="border border-gray-300 rounded-xl p-3 w-full mb-3 focus:outline-none focus:ring-2 focus:ring-orange-400"
-            />
+            type="text"
+            placeholder="Search restaurant..."
+            value={searchLocation}
+            onChange={(e) => setSearchLocation(e.target.value)}
+            className="border border-gray-300 rounded-xl p-3 w-full mb-3"
+          />
 
             {/* Veg / Non-Veg Filters */}
             <div className="flex gap-2 overflow-x-auto mb-3">

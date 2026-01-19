@@ -1,7 +1,13 @@
+//src\pages\OtpPage.jsx
+
 import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { LanguageContext } from "../context/LanguageContext";
 import { ArrowLeft } from "lucide-react";
+import { saveAuthData } from "../utils/auth";
+import { verifyOtp } from "../services/otpApi";
+import api from "../services/api";
+
 
 export default function OtpPage() {
   const navigate = useNavigate();
@@ -9,14 +15,16 @@ export default function OtpPage() {
   const { t } = useContext(LanguageContext);
 
   // Get number from LoginPage (ensure it shows +91 prefix)
-  const mobileNumber = location.state?.mobileNumber
-    ? `+91 ${location.state.mobileNumber}`
+  const mobile = location.state?.mobile || "";
+
+  const mobileNumber = mobile
+    ? `+91 ${mobile}`
     : "+91 XXXXX XXXXX";
 
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [timer, setTimer] = useState(30);
   const [resendVisible, setResendVisible] = useState(false);
- const inputsRef = useRef([]);
+  const inputsRef = useRef([]);
 
   // handle OTP input and navigation
   const handleChange = (value, index) => {
@@ -63,33 +71,64 @@ export default function OtpPage() {
   }, [timer]);
 
 // ✅ Verify handler — now redirects to /home when OTP is valid
-  const handleVerify = () => {
+  const handleVerify = async () => {
   const code = otp.join("");
-  if (code.length === 6) {
-    // Example: Replace with backend verification logic later
-    const isOtpValid = code === "123456"; // Temporary test OTP
-    if (isOtpValid) {
-      // ✅ Set login status
-      localStorage.setItem("isLoggedIn", "true");
 
-      // ✅ Redirect to Home page
-      navigate("/home");
-    } else {
-      alert("⚠️ Invalid OTP. Please try again.");
+  if (code.length !== 6) {
+    alert("Please enter 6 digits");
+    return;
+  }
+
+  try {
+    const data = await verifyOtp({
+      mobile: location.state?.mobile,
+      otp: code,
+    });
+
+    if (!data.status) {
+      alert(data.message || "OTP verification failed");
+      return;
     }
-  } else {
-    alert("⚠️ Please enter 6 digits");
+
+    // ✅ STORE JWT + USER
+    saveAuthData({
+      access: data.access,
+      refresh: data.refresh,
+      user: data.user,
+    });
+
+    // ✅ REDIRECT
+    navigate("/home");
+  } catch (err) {
+    console.error(err);
+    alert("Server error. Please try again.");
   }
 };
 
-  const handleResend = () => {
-    setTimer(30);
-    setResendVisible(false);
-    alert("OTP resent successfully!");
-  };
+
+ const handleResend = async () => {
+  setTimer(30);
+  setResendVisible(false);
+
+  try {
+    await api.post("/api/v1/users/admin/request-otp/", {
+      mobile: location.state?.mobile,
+    });
+  } catch (e) {
+    alert("Failed to resend OTP");
+  }
+};
+
 
   // check if all 6 digits entered
   const isOtpComplete = otp.every((digit) => digit !== "");
+
+  useEffect(() => {
+  if (!location.state?.mobile) {
+    navigate("/");
+  }
+}, []);
+
 
   return (
   <div className="min-h-screen flex flex-col bg-[#fff6ed]">

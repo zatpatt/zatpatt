@@ -1,3 +1,4 @@
+//src\utils\notifications.js
 export const triggerNotification = () => {
   const mode = localStorage.getItem("appSoundMode") || "sound";
 

@@ -1,3 +1,4 @@
+//src\pages\FavoritesPage.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Heart, Search, Filter } from "lucide-react";

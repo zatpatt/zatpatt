@@ -1,4 +1,4 @@
-// src/pages/ProductDetailPage.jsx
+// src/pages/ProductPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ArrowLeft, Star, ShoppingCart, Tag, Plus, Minus } from "lucide-react";

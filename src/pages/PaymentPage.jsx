@@ -1,7 +1,9 @@
+//src\pages\PaymentPage.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreditCard, Wallet, ArrowLeft, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { initiatePaymentApi } from "../services/paymentApi";
 
 export default function PaymentPage() {
   const navigate = useNavigate();
@@ -21,26 +23,39 @@ export default function PaymentPage() {
 
   if (!order) return null;
 
-  const { subtotal, deliveryTip, donation, redeemPoints, discount, deliveryCharge, totalAmount } = order;
+  const finalAmount = order.preview_total ?? 0;
 
-  // ✅ Force final amount = exact total stored from cart
-  const finalAmount = totalAmount ?? 0;
 
-  const handlePayment = () => {
-    const updatedOrder = {
-      ...order,
-      paymentMethod: "cod",
-      paymentStatus: "pending",
-      totalAmount: finalAmount,
-    };
+  const handlePayment = async () => {
+  try {
+    const res = await initiatePaymentApi({
+      address_id: order.address_id,
+      use_points: order.use_points,
+      tip: order.tip,
+      code: order.code,
+      payment_method: "COD",
+      remark: order.remark,
+    });
 
-    localStorage.setItem("currentOrder", JSON.stringify(updatedOrder));
-    localStorage.setItem("cartItems", JSON.stringify([]));
-    const remaining = (order.currentPoints || 0) - (order.redeemPoints || 0);
-    localStorage.setItem("currentPoints", Math.max(remaining, 0));
+    if (!res?.status) {
+      alert(res?.message || "Order placement failed");
+      return;
+    }
+
+    // ✅ Backend is now source of truth
+   localStorage.setItem("currentOrder", JSON.stringify(res));
+
+
+    localStorage.removeItem("cartItems");
 
     navigate("/order-success");
-  };
+  } catch (err) {
+    console.error("Payment failed", err);
+    alert("Unable to place order");
+  }
+};
+
+
 
   // ✅ Only COD enabled
   const paymentOptions = [

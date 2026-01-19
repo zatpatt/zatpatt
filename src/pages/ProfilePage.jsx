@@ -15,6 +15,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useFavorites } from "../context/FavoritesContext";
 import { MapPin } from "lucide-react";
+import { fetchMyProfile, uploadProfilePhoto } from "../services/profileApi";
 
 
 /**
@@ -28,93 +29,97 @@ import { MapPin } from "lucide-react";
  - Orders saved in localStorage under key: "user_orders"
 */
 
-const ORDERS_KEY = "user_orders";
+// const ORDERS_KEY = "user_orders";
 
-function sampleOrders() {
-  // sample order data (if none in localStorage)
-  return [
-    {
-      id: "ORD-20251106-001",
-      store: "Spicy Hub",
-      date: "2025-11-06T18:23:00Z",
-      amount: 220,
-      items: [{ name: "Butter Chicken", qty: 1 }, { name: "Naan", qty: 2 }],
-      status: "delivered", // pending | preparing | out_for_delivery | delivered | cancelled
-      delivery: {
-        trackingId: "TRK-1001",
-        etaMins: 12,
-      },
-      rated: false,
-      rating: null,
-      review: "",
-    },
-    {
-      id: "ORD-20251105-003",
-      store: "Sweet Treats",
-      date: "2025-11-05T13:11:00Z",
-      amount: 180,
-      items: [{ name: "Cupcake Box", qty: 1 }],
-      status: "out_for_delivery",
-      delivery: {
-        trackingId: "TRK-1000",
-        etaMins: 6,
-      },
-      rated: false,
-      rating: null,
-      review: "",
-    },
-    {
-      id: "ORD-20251104-007",
-      store: "Vasind Katta",
-      date: "2025-11-04T20:30:00Z",
-      amount: 200,
-      items: [{ name: "Thali", qty: 1 }],
-      status: "preparing",
-      delivery: {
-        trackingId: "TRK-0998",
-        etaMins: 20,
-      },
-      rated: false,
-      rating: null,
-      review: "",
-    },
-    {
-      id: "ORD-20251103-002",
-      store: "Mitra A Biryani",
-      date: "2025-11-03T19:15:00Z",
-      amount: 160,
-      items: [{ name: "Biryani", qty: 1 }],
-      status: "delivered",
-      delivery: {
-        trackingId: "TRK-0997",
-        etaMins: 0,
-      },
-      rated: true,
-      rating: 5,
-      review: "Delicious!",
-    },
-    {
-      id: "ORD-20251101-009",
-      store: "Velvet Scoops",
-      date: "2025-11-01T14:10:00Z",
-      amount: 120,
-      items: [{ name: "Ice Cream", qty: 2 }],
-      status: "cancelled",
-      delivery: {
-        trackingId: "TRK-0990",
-        etaMins: 0,
-      },
-      rated: false,
-      rating: null,
-      review: "",
-    },
-  ];
-}
+// function sampleOrders() {
+//   // sample order data (if none in localStorage)
+//   return [
+//     {
+//       id: "ORD-20251106-001",
+//       store: "Spicy Hub",
+//       date: "2025-11-06T18:23:00Z",
+//       amount: 220,
+//       items: [{ name: "Butter Chicken", qty: 1 }, { name: "Naan", qty: 2 }],
+//       status: "delivered", // pending | preparing | out_for_delivery | delivered | cancelled
+//       delivery: {
+//         trackingId: "TRK-1001",
+//         etaMins: 12,
+//       },
+//       rated: false,
+//       rating: null,
+//       review: "",
+//     },
+//     {
+//       id: "ORD-20251105-003",
+//       store: "Sweet Treats",
+//       date: "2025-11-05T13:11:00Z",
+//       amount: 180,
+//       items: [{ name: "Cupcake Box", qty: 1 }],
+//       status: "out_for_delivery",
+//       delivery: {
+//         trackingId: "TRK-1000",
+//         etaMins: 6,
+//       },
+//       rated: false,
+//       rating: null,
+//       review: "",
+//     },
+//     {
+//       id: "ORD-20251104-007",
+//       store: "Vasind Katta",
+//       date: "2025-11-04T20:30:00Z",
+//       amount: 200,
+//       items: [{ name: "Thali", qty: 1 }],
+//       status: "preparing",
+//       delivery: {
+//         trackingId: "TRK-0998",
+//         etaMins: 20,
+//       },
+//       rated: false,
+//       rating: null,
+//       review: "",
+//     },
+//     {
+//       id: "ORD-20251103-002",
+//       store: "Mitra A Biryani",
+//       date: "2025-11-03T19:15:00Z",
+//       amount: 160,
+//       items: [{ name: "Biryani", qty: 1 }],
+//       status: "delivered",
+//       delivery: {
+//         trackingId: "TRK-0997",
+//         etaMins: 0,
+//       },
+//       rated: true,
+//       rating: 5,
+//       review: "Delicious!",
+//     },
+//     {
+//       id: "ORD-20251101-009",
+//       store: "Velvet Scoops",
+//       date: "2025-11-01T14:10:00Z",
+//       amount: 120,
+//       items: [{ name: "Ice Cream", qty: 2 }],
+//       status: "cancelled",
+//       delivery: {
+//         trackingId: "TRK-0990",
+//         etaMins: 0,
+//       },
+//       rated: false,
+//       rating: null,
+//       review: "",
+//     },
+//   ];
+// }
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
-
+  const [profile, setProfile] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  
+  
   // basic profile state (kept from your earlier code)
   const [email, setEmail] = useState(localStorage.getItem("userEmail") || "");
   const [phone] = useState(localStorage.getItem("userPhone") || "");
@@ -136,26 +141,51 @@ export default function ProfilePage() {
   }, [savedLater]);
 
   // Orders state: load from localStorage or seed samples
-  const [orders, setOrders] = useState(() => {
-    try {
-      const raw = localStorage.getItem(ORDERS_KEY);
-      if (!raw) {
-        const seed = sampleOrders();
-        localStorage.setItem(ORDERS_KEY, JSON.stringify(seed));
-        return seed;
-      }
-      return JSON.parse(raw);
-    } catch (e) {
-      const seed = sampleOrders();
-      localStorage.setItem(ORDERS_KEY, JSON.stringify(seed));
-      return seed;
-    }
-  });
+  // const [orders, setOrders] = useState(() => {
+  //   try {
+  //     const raw = localStorage.getItem(ORDERS_KEY);
+  //     if (!raw) {
+  //       const seed = sampleOrders();
+  //       localStorage.setItem(ORDERS_KEY, JSON.stringify(seed));
+  //       return seed;
+  //     }
+  //     return JSON.parse(raw);
+  //   } catch (e) {
+  //     const seed = sampleOrders();
+  //     localStorage.setItem(ORDERS_KEY, JSON.stringify(seed));
+  //     return seed;
+  //   }
+  // });
 
   // persist orders
   useEffect(() => {
-    localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
-  }, [orders]);
+  const loadProfile = async () => {
+    try {
+      setLoadingProfile(true);
+
+      const res = await fetchMyProfile();
+
+      if (!res?.status) {
+        throw new Error("Profile fetch failed");
+      }
+
+      const data = res.data;
+
+      setProfile(data);
+      setOrders(data.orders || []);
+
+      setUserName(data.full_name || "");
+      setEmail(data.email || "");
+    } catch (err) {
+      console.error("Profile error", err);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  loadProfile();
+}, []);
+
 
   // show either 3 recent or all in modal
   const [showAllOrdersModal, setShowAllOrdersModal] = useState(false);
@@ -198,12 +228,15 @@ export default function ProfilePage() {
   }, []);
 
   // utility: get ordered list by date desc
-  const sortedByDateDesc = (list) =>
-    [...list].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // const sortedByDateDesc = (list) =>
+  //   [...list].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  // ----- Recent orders preview (3 most recent) -----
-  const recentThree = sortedByDateDesc(orders).slice(0, 3);
+  // // ----- Recent orders preview (3 most recent) -----
+  // const recentThree = sortedByDateDesc(orders).slice(0, 3);
 
+  const recentThree = orders.slice(0, 3);
+
+  
   // ----- View / open order detail -----
   const openOrder = (order) => {
     setSelectedOrder(order);
@@ -309,13 +342,35 @@ export default function ProfilePage() {
   };
 
   // profile image upload
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setProfileImage(reader.result);
-    reader.readAsDataURL(file);
-  };
+  const handleFileChange = async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  try {
+    // show preview immediately
+    const preview = URL.createObjectURL(file);
+    setProfileImage(preview);
+
+    const res = await uploadProfilePhoto(file);
+
+    if (!res?.status) {
+      throw new Error("Profile upload failed");
+    }
+
+    // backend may return updated photo URL
+    if (res.data?.profile_photo) {
+      setProfile((prev) => ({
+        ...prev,
+        profile_photo: res.data.profile_photo,
+      }));
+    }
+
+  } catch (err) {
+    console.error("Profile upload error", err);
+    alert("Failed to upload profile photo");
+  }
+};
+
 
   // edit profile
   const handleEditClick = () => {
@@ -345,6 +400,15 @@ export default function ProfilePage() {
     navigate("/");
   };
 
+  if (loadingProfile) {
+  return (
+    <div className="min-h-screen flex items-center justify-center text-gray-500">
+      Loading profile…
+    </div>
+  );
+}
+
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white flex flex-col relative items-center">
       {/* Header */}
@@ -367,10 +431,14 @@ export default function ProfilePage() {
         {/* Profile Card */}
         <div className="bg-white rounded-2xl shadow-md p-6 flex flex-col items-center text-center relative">
           <div className="relative w-24 h-24 mb-4">
-            {profileImage ? (
-              <img src={profileImage} alt="Profile" className="w-24 h-24 rounded-full object-cover" />
-            ) : (
-              <div className="w-24 h-24 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center text-4xl">
+           {profile?.profile_photo || profileImage ? (
+            <img
+              src={profile?.profile_photo || profileImage}
+              className="w-24 h-24 rounded-full object-cover"
+              alt="Profile"
+            />
+          ) : (
+              <div className="w-24 h-24 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center">
                 <User size={50} />
               </div>
             )}
@@ -403,9 +471,16 @@ export default function ProfilePage() {
             </div>
           ) : (
             <>
-              <h2 className="text-xl font-semibold">{userName || "Your Name"}</h2>
-              <p className="text-gray-500 text-sm">{email || "No email added yet"}</p>
-              <p className="text-gray-500 text-sm mb-4">{phone}</p>
+             <h2 className="text-xl font-semibold">
+              {profile?.full_name || "Your Name"}
+            </h2>
+            <p className="text-gray-500 text-sm">
+              {profile?.email || "No email added"}
+            </p>
+            <p className="text-gray-500 text-sm mb-4">
+            {profile?.mobile}
+            </p>
+
             </>
           )}
 
@@ -446,60 +521,47 @@ export default function ProfilePage() {
         </div>
 
         {/* Recent Orders */}
-        <div className="mt-6">
-          <h3 className="text-lg font-semibold mb-3">🛒 Recent Orders</h3>
-          <div className="space-y-2">
-            {recentThree.length === 0 ? (
-              <div className="text-gray-500 p-4 rounded-xl bg-white">No recent orders</div>
+        
+           <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-3">🛒 Recent Orders</h3>
+
+            {orders.length === 0 ? (
+              <div className="text-gray-500 p-4 rounded-xl bg-white">
+                No orders yet
+              </div>
             ) : (
               recentThree.map((order) => (
-                <motion.div
-                  key={order.id}
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
+                <div
+                  key={order.order_code}
+                  className="bg-white p-3 rounded-xl shadow flex justify-between items-center mb-2"
                 >
-                  <button
-                    onClick={() => openOrder(order)}
-                    className="w-full text-left bg-white p-3 rounded-xl shadow flex justify-between items-start gap-3"
-                  >
-                    <div>
-                      <div className="font-semibold">{order.store}</div>
-                      <div className="text-xs text-gray-500">{niceDate(order.date)}</div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {order.items?.map((it) => `${it.name} x${it.qty}`).join(" • ")}
-                      </div>
+                  <div>
+                    <div className="font-semibold">
+                      {order.order_code}
                     </div>
-                    <div className="text-right">
-                      <div className="font-bold">₹{order.amount}</div>
-                      <div className="text-xs mt-2">
-                        {order.status === "delivered" ? (
-                          <span className="text-green-600 font-medium">Delivered</span>
-                        ) : order.status === "cancelled" ? (
-                          <span className="text-red-500 font-medium">Cancelled</span>
-                        ) : order.status === "out_for_delivery" ? (
-                          <span className="text-orange-600 font-medium">Out for delivery</span>
-                        ) : (
-                          <span className="text-gray-500">{order.status}</span>
-                        )}
-                      </div>
+                    <div className="text-xs text-gray-500 capitalize">
+                      Status: {order.status}
                     </div>
-                  </button>
-                </motion.div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="font-bold">
+                      ₹{order.total_amount}
+                    </div>
+                  </div>
+                </div>
               ))
             )}
+
+            {orders.length > 3 && (
+              <button
+                onClick={() => navigate("/allorders")}
+                className="mt-2 text-orange-500 font-medium hover:underline"
+              >
+                View More Orders
+              </button>
+            )}
           </div>
-
-        {orders.length > 3 && (
-  <button
-    onClick={() => navigate("/allorders")}
-    className="mt-2 text-orange-500 font-medium hover:underline"
-  >
-    View More Orders
-  </button>
-)}
-
-        </div>
 
         {/* Favorites & Saved for Later (kept minimal) */}
        {/* Favorites Section */}

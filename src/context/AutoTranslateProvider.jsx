@@ -1,3 +1,4 @@
+//src\context\AutoTranslateProvider.jsx
 import React, { createContext, useState, useEffect } from "react";
 import translate from "libretranslate";
 

@@ -1,4 +1,4 @@
-// src/translations.js
+//src\translations\index.js
 const translations = {
   en: {
     title: "Log In or Sign Up",

@@ -1,3 +1,4 @@
+//src\pages\FaqPage.jsx
 import React, { useState } from "react";
 import { ArrowLeft, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";

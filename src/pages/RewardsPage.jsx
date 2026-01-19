@@ -1,3 +1,4 @@
+//src\pages\RewardsPage.jsx
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Gift, ArrowLeft } from "lucide-react";
@@ -21,12 +22,11 @@ export default function RewardsPage() {
   const [streak, setStreak] = useState(0);
 
   const rules = [
-    "💰 Earn 1 point for every ₹10 you spend on your orders.",
-    "⭐ Rate your orders and get 2 bonus points each time.",
-    "🤝 Refer a friend and earn 50 points for every successful referral.",
-    "🔥 Complete 5+ orders in a month to unlock a 50-point streak bonus.",
-    "📅 Log in daily to earn extra points and keep your streak active.",
-    "🎉 Get 10 points on your first order, 5 points on your second, and 1 point on your third.",
+    "💰 Earn 1 point for every ₹99 spent on your orders.",
+    "⭐ Rate your orders and get up to 5 bonus points each time.",
+    "🤝 Refer a friend and earn up to 50 points for every successful referral.",
+    "🔥 Complete 5 or more orders in a month to unlock an up to 50-point streak bonus.",
+    "🎉 Get up to 10 points on your first order, up to 5 points on your second, and up to 1 point on your third.",
     "🎡 Try your luck with Spin & Win for surprise bonus rewards every day!",
   ];
 
@@ -42,25 +42,25 @@ export default function RewardsPage() {
     setReferrals(rc);
     setStreak(st);
 
-    handleDailyLoginLogic();
+    // handleDailyLoginLogic();
   }, []);
 
   /**
    * DAILY LOGIN LOGIC
    */
-  const handleDailyLoginLogic = () => {
-    const today = new Date().toLocaleDateString();
-    const lastLogin = localStorage.getItem(LAST_LOGIN_KEY);
+  // const handleDailyLoginLogic = () => {
+  //   const today = new Date().toLocaleDateString();
+  //   const lastLogin = localStorage.getItem(LAST_LOGIN_KEY);
 
-    if (lastLogin === today) return; // Already logged in today
+  //   if (lastLogin === today) return; // Already logged in today
 
-    // new login → +1 streak point + streak increment
-    let newStreak = streak + 1;
-    localStorage.setItem(STREAK_KEY, newStreak);
-    localStorage.setItem(LAST_LOGIN_KEY, today);
+  //   // new login → +1 streak point + streak increment
+  //   let newStreak = streak + 1;
+  //   localStorage.setItem(STREAK_KEY, newStreak);
+  //   localStorage.setItem(LAST_LOGIN_KEY, today);
 
-    addPoints(1);
-  };
+  //   addPoints(1);
+  // };
 
   /**
    * ADD POINTS LOGIC (shared by all activities)
@@ -85,7 +85,7 @@ const addPoints = (value) => {
    */
   const handleSpin = () => navigate("/spinandwin");
   const handleRefer = () => navigate("/referafriend");
-  const handleDailyLogin = () => navigate("/dailylogin");
+  // const handleDailyLogin = () => navigate("/dailylogin");
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white flex flex-col relative items-center">
@@ -180,13 +180,13 @@ const addPoints = (value) => {
               🎯 Refer & Earn
             </motion.button>
 
-            <motion.button
+            {/* <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={handleDailyLogin}
               className="bg-orange-500 text-white px-4 py-2 rounded-full shadow-md hover:bg-orange-600 transition text-sm w-full"
             >
               📅 Daily Login
-            </motion.button>
+            </motion.button> */}
           </div>
         </div>
       </motion.div>

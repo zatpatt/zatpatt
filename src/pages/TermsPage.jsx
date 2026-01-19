@@ -1,3 +1,4 @@
+//src\pages\TermsPage.jsx
 import React from "react";
 import { ArrowLeft, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
