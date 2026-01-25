@@ -12,6 +12,7 @@ import {
   goToCartApi,
 } from "../services/cartApi";
 
+
 /*
   RestaurantPage.jsx
   - Full accordion category UI (only one open at a time)
@@ -32,6 +33,7 @@ export default function RestaurantPage() {
   const [loading, setLoading] = useState(true);
   const [restaurantData, setRestaurantData] = useState(null);
 
+
   // accordion state: which category id is open (only one at a time)
   const [openCategory, setOpenCategory] = useState(null);
 
@@ -46,25 +48,25 @@ export default function RestaurantPage() {
   const cartMerchantId = localStorage.getItem("cartMerchantId");
   const cartMerchantName = localStorage.getItem("cartMerchantName");
 
-  // cart (persisted in localStorage)
-  const [cart, setCart] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("cartItems") || "[]");
-    } catch {
-      return [];
-    }
-  });
+//   // cart (persisted in localStorage)
+//   const [cart, setCart] = useState(() => {
+//     try {
+//       return JSON.parse(localStorage.getItem("cartItems") || "[]");
+//     } catch {
+//       return [];
+//     }
+//   });
 
-  // ✅ KEEP CART SYNCED WITH LOCAL STORAGE
-useEffect(() => {
-  localStorage.setItem("cartItems", JSON.stringify(cart));
-}, [cart]);
+//   // ✅ KEEP CART SYNCED WITH LOCAL STORAGE
+// useEffect(() => {
+//   localStorage.setItem("cartItems", JSON.stringify(cart));
+// }, [cart]);
 
 
 
-  const getCartItem = (menuId) => {
-  return cart.find(c => c.id === menuId);
-};
+//   const getCartItem = (menuId) => {
+//   return cart.find(c => c.id === menuId);
+// };
 
   // item detail modal
   const [detailItem, setDetailItem] = useState(null);
@@ -74,6 +76,23 @@ useEffect(() => {
 
   // ---------- Demo data ----------
    
+  const mapMenuItem = (item) => {
+  return {
+    id: item.menu_id,                 // 🔑 REQUIRED
+    name: item.name,
+    price: item.price,
+    originalPrice: item.actual_price || item.price,
+    quantity: item.quantity || 0,     // 🔥 THIS FIXES YOUR QUANTITY ISSUE
+    img: item.image || null,
+    veg: item.food === "veg",
+    desc: item.description || "",
+    rating: item.rating || 0,
+    hasDiscount:
+      item.actual_price &&
+      item.actual_price > item.price,
+  };
+};
+
   // ---------- Load restaurant + menu ----------
   useEffect(() => {
   const fetchMenu = async () => {
@@ -92,25 +111,13 @@ useEffect(() => {
   {
     id: "recommended",
     name: "Recommended",
-    items: res.data.map((item) => ({
-      id: item.menu_id,
-      name: item.menu_name,
-     price: Number(item.discounted_price || item.menu_price),
-      originalPrice: Number(item.menu_price),
-      hasDiscount:
-      item.discounted_price &&
-      Number(item.discounted_price) < Number(item.menu_price),
-      veg: item.is_veg,
-      rating: 0,
-      desc: item.menu_description || "",
-      img:
-      item.menu_image && item.menu_image.trim() !== ""
-        ? `${import.meta.env.VITE_API_BASE_URL}${item.menu_image}`
-        : demoUploadedImage,
-      label: item.label, // optional future use
-        })),
+     items: res.data.map(mapMenuItem),
+
       },
+      
     ];
+
+   
 
       setRestaurantData({
         id,
@@ -140,33 +147,46 @@ useEffect(() => {
   fetchMenu();
 }, [id]);
 
+ 
+const syncCartCount = async () => {
+  try {
+    const res = await goToCartApi();
+    if (!res?.status) return;
+
+    localStorage.setItem(
+      "cartCount",
+      res.summary?.total_items || 0
+    );
+  } catch {}
+};
+
 
   // persist cart to localStorage
-  useEffect(() => {
-    const cartCount = cart.reduce((s, it) => s + it.quantity, 0);
-  }, [cart]);
+  // useEffect(() => {
+  //   const cartCount = cart.reduce((s, it) => s + it.quantity, 0);
+  // }, [cart]);
 
-  const syncCartUI = (itemId, delta) => {
-  setCart(prev => {
-    const found = prev.find(p => p.id === itemId);
+//   const syncCartUI = (itemId, delta) => {
+//   setCart(prev => {
+//     const found = prev.find(p => p.id === itemId);
 
-    if (!found && delta > 0) {
-      return [...prev, { id: itemId, quantity: delta }];
-    }
+//     if (!found && delta > 0) {
+//       return [...prev, { id: itemId, quantity: delta }];
+//     }
 
-    if (!found) return prev;
+//     if (!found) return prev;
 
-    const newQty = found.quantity + delta;
+//     const newQty = found.quantity + delta;
 
-    if (newQty <= 0) {
-      return prev.filter(p => p.id !== itemId);
-    }
+//     if (newQty <= 0) {
+//       return prev.filter(p => p.id !== itemId);
+//     }
 
-    return prev.map(p =>
-      p.id === itemId ? { ...p, quantity: newQty } : p
-    );
-  });
-};
+//     return prev.map(p =>
+//       p.id === itemId ? { ...p, quantity: newQty } : p
+//     );
+//   });
+// };
 
 const goToCart = async () => {
   const selected =
@@ -204,50 +224,38 @@ const goToCart = async () => {
   }
 };
 
-
 const addToCart = async (item) => {
-  const currentRestaurantId = String(id); // ✅ normalize
-  const existingMerchantId = String(
-    localStorage.getItem("cartMerchantId") || ""
-  );
+  await addToCartApi({
+  menuIds: [item.id],
+  productIds: [],
+  quantity: item.quantity + 1,
+});
 
-  // 🛑 Show popup ONLY if cart belongs to ANOTHER restaurant
-  if (
-    cart.length > 0 &&
-    existingMerchantId &&
-    existingMerchantId !== currentRestaurantId
-  ) {
-    setPendingItem(item);
-    setShowReplacePopup(true);
-    return;
+await syncCartCount();
+
+
+  const res = await getMerchantMenu(id);
+
+ setRestaurantData(prev => ({
+  ...prev,
+  menu: {
+    categories: [{
+      ...prev.menu.categories[0],
+      items: res.data.map(mapMenuItem),
+    }]
   }
-
-  const currentQty = quantityOf(item.id);
-
-  try {
-    syncCartUI(item.id, 1);
-
-    await addToCartApi({
-      menuIds: [item.id],
-      productIds: [],
-      quantity: currentQty + 1,
-    });
-
-    // ✅ Save merchant id ONCE and consistently
-    localStorage.setItem("cartMerchantId", currentRestaurantId);
-    localStorage.setItem("cartMerchantName", restaurantData.name);
-  } catch (err) {
-    syncCartUI(item.id, -1);
-    alert("Failed to add item");
-  }
+}));
 };
 
-useEffect(() => {
-  if (cart.length === 0) {
-    localStorage.removeItem("cartMerchantId");
-    localStorage.removeItem("cartMerchantName");
-  }
-}, [cart]);
+
+
+
+// useEffect(() => {
+//   if (cart.length === 0) {
+//     localStorage.removeItem("cartMerchantId");
+//     localStorage.removeItem("cartMerchantName");
+//   }
+// }, [cart]);
 
 
 const confirmReplaceCart = async () => {
@@ -283,28 +291,34 @@ const cancelReplaceCart = () => {
 
 
 const removeOne = async (item) => {
-  const currentQty = quantityOf(item.id);
-  if (currentQty <= 0) return;
+  if (item.quantity <= 0) return;
 
-  try {
-    syncCartUI(item.id, -1);
+  await addToCartApi({
+  menuIds: [item.id],
+  productIds: [],
+  quantity: item.quantity - 1,
+});
 
-    await addToCartApi({
-      menuIds: [item.id],
-      productIds: [],
-      quantity: currentQty - 1,
-    });
-  } catch (err) {
-    syncCartUI(item.id, 1); // rollback
-    alert("Failed to update item");
+await syncCartCount();
+
+  const res = await getMerchantMenu(id);
+setRestaurantData(prev => ({
+  ...prev,
+  menu: {
+    categories: [{
+      ...prev.menu.categories[0],
+      items: res.data.map(mapMenuItem),
+    }]
   }
+}));
 };
 
 
-  const quantityOf = (itemId) => {
-    const it = cart.find(c => c.id === itemId);
-    return it ? it.quantity : 0;
-  };
+
+//  const quantityOf = (id) => {
+//   const item = cart.find(c => c.id === Number(id));
+//   return item ? item.quantity : 0;
+// };
 
 
   // filtered categories & items according to search/filter/sort
@@ -354,8 +368,8 @@ const removeOne = async (item) => {
     );
   }
 
-  const cartCount = cart.reduce((s, it) => s + (it.quantity || 0), 0);
-  const cartTotal = cart.reduce((s, it) => s + it.quantity, 0);
+  // const cartCount = cart.reduce((s, it) => s + (it.quantity || 0), 0);
+  // const cartTotal = cart.reduce((s, it) => s + it.quantity, 0);
 
 
   const getDiscountPercent = (item) => {
@@ -367,6 +381,19 @@ const removeOne = async (item) => {
   // cap at 90% for UI (backend still controls pricing)
   return Math.min(90, Math.round(percent));
 };
+
+const allItems =
+  restaurantData?.menu?.categories?.[0]?.items || [];
+
+const cartCount = allItems.reduce(
+  (sum, item) => sum + (item.quantity || 0),
+  0
+);
+
+const cartTotal = allItems.reduce(
+  (sum, item) => sum + item.quantity * item.price,
+  0
+);
 
 
   return (
@@ -482,7 +509,7 @@ const removeOne = async (item) => {
                     >
                       −
                     </button>
-                    <div className="px-3">{quantityOf(item.id)}</div>
+                   <div className="px-3">{item.quantity}</div>
                     <button
                       onClick={() => addToCart(item)}
                       className="px-3 py-1 bg-orange-500 text-white rounded-full"
@@ -545,7 +572,7 @@ const removeOne = async (item) => {
 
                                 <div className="flex items-center gap-2">
                                   <button onClick={() => removeOne(item)} className="px-3 py-1 border rounded-full">−</button>
-                                  <div className="px-3">{quantityOf(item.id)}</div>
+                                 <div className="px-3">{item.quantity}</div>
                                   <button onClick={() => addToCart(item)} className="px-3 py-1 bg-orange-500 text-white rounded-full">+</button>
                                 </div>
                               </div>
@@ -587,7 +614,7 @@ const removeOne = async (item) => {
 
               <div className="flex items-center gap-2">
                 <button onClick={() => removeOne(detailItem)} className="px-3 py-1 border rounded-full">−</button>
-                <div className="px-3">{quantityOf(detailItem.id)}</div>
+               <div className="px-3">{detailItem.quantity}</div>
                 <button onClick={() => addToCart(detailItem)} className="px-4 py-2 bg-orange-500 text-white rounded-xl">Add</button>
               </div>
             </div>
