@@ -1,4 +1,5 @@
 // src/pages/HomePage.jsx
+
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -10,7 +11,6 @@ import { Heart } from "lucide-react";
 import { useFavorites } from "../context/FavoritesContext";
 import { getAccessToken } from "../utils/auth";
 import { getRestaurantList } from "../services/homeApi";
-import { getCartList } from "../services/cartApi";
 
 
 export default function HomePage() {
@@ -50,10 +50,10 @@ const { favorites, addFavorite, removeFavorite } = useFavorites();
   const [filter, setFilter] = useState("All");
   const [filteredRestaurants, setFilteredRestaurants] = useState([]);
 
-  // const updateCartCount = () => {
-  //   const storedCart = JSON.parse(localStorage.getItem("cartItems")) || [];
-  //   setCartCount(storedCart.reduce((acc, item) => acc + (item.quantity || 0), 0));
-  // };
+  const updateCartCount = () => {
+    const storedCart = JSON.parse(localStorage.getItem("cartItems")) || [];
+    setCartCount(storedCart.reduce((acc, item) => acc + (item.quantity || 0), 0));
+  };
 
   // Request browser geolocation
   const requestLocation = () => {
@@ -80,97 +80,6 @@ const { favorites, addFavorite, removeFavorite } = useFavorites();
     }
   };
 
-  const fetchRestaurants = async () => {
-  try {
-    setLoading(true);
-    await fetchCartCount();
-
-    const res = await getRestaurantList({
-      search: searchLocation || "",
-      food:
-        filter === "Pure Veg"
-          ? "veg"
-          : filter === "Non-Veg"
-          ? "non_veg"
-          : "",
-    });
-
-    if (!res?.status) return;
-
-    const formatted = res.data.map((r) => ({
-      id: r.merchant_id,
-      name: r.name,
-      location: r.city || "Nearby",
-      distance: "-",
-      isVeg: r.food === "veg",
-      price: "-",
-      time: "-",
-      rating: "-",
-      img:
-        r.logo ||
-        "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?auto=format&fit=crop&w=800&q=60",
-    }));
-
-    setRestaurants(formatted);
-    setNearbyRestaurants(formatted);
-  } catch (err) {
-    console.error("Fetch restaurants failed", err);
-  } finally {
-    setLoading(false);
-  }
-};
-
-useEffect(() => {
-  fetchRestaurants();
-}, [searchLocation, filter]);
-
-
-//   useEffect(() => {
-//   const fetchRestaurants = async () => {
-//     try {
-//       setLoading(true);
-//       fetchCartCount();
-
-//       const res = await getRestaurantList({
-//         search: searchLocation || "",
-//         food:
-//           filter === "Pure Veg"
-//             ? "veg"
-//             : filter === "Non-Veg"
-//             ? "non_veg"
-//             : "",
-//       });
-
-//       if (res.status) {
-//         const formatted = res.data.map((r) => ({
-//           id: r.merchant_id,
-//           name: r.name,
-//           location: r.city || "Nearby",
-//           distance: "-",
-//           isVeg: r.food === "veg",
-//           price: "-",
-//           time: "-",
-//           rating: "-",
-//           img:
-//             r.logo ||
-//             "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?auto=format&fit=crop&w=800&q=60",
-//         }));
-
-//         setRestaurants(formatted);
-//         setNearbyRestaurants(formatted);
-//       }
-//     } catch (err) {
-//       console.error(err);
-//       alert("Failed to load restaurants");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   fetchRestaurants();
-// }, [searchLocation, filter]);
-
-
   // on change search/filter/nearby update filteredRestaurants
   useEffect(() => {
     let filtered = nearbyRestaurants.slice();
@@ -188,53 +97,52 @@ useEffect(() => {
     setFilteredRestaurants(filtered);
   }, [searchText, filter, nearbyRestaurants]);
 
-  
+  useEffect(() => {
+  const fetchRestaurants = async () => {
+    try {
+      setLoading(true);
+      updateCartCount();
 
-const fetchCartCount = async () => {
-  try {
-    const res = await getCartList({});
-    if (!res?.status) {
-      setCartCount(0);
-      return;
+      const res = await getRestaurantList({
+        search: searchLocation || "",
+        food:
+          filter === "Pure Veg"
+            ? "veg"
+            : filter === "Non-Veg"
+            ? "non_veg"
+            : "",
+      });
+
+      if (res.status) {
+        const formatted = res.data.map((r) => ({
+          id: r.merchant_id,
+          name: r.name,
+          location: r.city || "Nearby",
+          distance: "-",
+          isVeg: r.food === "veg",
+          price: "-",
+          time: "-",
+          rating: "-",
+          img:
+            r.logo ||
+            "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?auto=format&fit=crop&w=800&q=60",
+        }));
+
+        setRestaurants(formatted);
+        setNearbyRestaurants(formatted);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to load restaurants");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const count = (res.items || []).reduce(
-      (sum, item) => sum + (item.quantity || 0),
-      0
-    );
-
-    setCartCount(count);
-  } catch (err) {
-    console.error("Cart count fetch failed", err);
-    setCartCount(0);
-  }
-};
-
-useEffect(() => {
   fetchRestaurants();
 }, [searchLocation, filter]);
 
-const syncCartCount = async () => {
-  try {
-    const res = await goToCartApi();
-    if (!res?.status) return;
 
-    localStorage.setItem(
-      "cartCount",
-      res.summary?.total_items || 0
-    );
-  } catch {}
-};
-
-useEffect(() => {
-  const count = Number(localStorage.getItem("cartCount") || 0);
-  setCartCount(count);
-}, []);
-
-// useEffect(() => {
-//   const count = Number(localStorage.getItem("cartCount") || 0);
-//   setCartCount(count);
-// }, []);
 
   // // initial demo restaurants load
   // useEffect(() => {
@@ -367,7 +275,7 @@ useEffect(() => {
       const updatedCart = [...storedCart, { ...item, quantity: 1 }];
       localStorage.setItem("cartItems", JSON.stringify(updatedCart));
     }
-     fetchCartCount();
+    updateCartCount();
   };
 
   const offerImages = [

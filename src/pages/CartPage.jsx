@@ -1,4 +1,4 @@
-// ✅ src/pages/CartPage.jsx
+//src/pages/CartPage.jsx
 
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -218,11 +218,6 @@ const increaseQty = async (item) => {
       quantity: item.quantity + 1,
     });
     await refreshCart();
-//     localStorage.setItem(
-//   "cartCount",
-//   res.summary?.total_items || 0
-// );
-
   } catch (err) {
     console.error("Increase qty failed", err);
   }
@@ -237,11 +232,6 @@ const decreaseQty = async (item) => {
       quantity: item.quantity - 1,
     });
     await refreshCart();
-//     localStorage.setItem(
-//   "cartCount",
-//   res.summary?.total_items || 0
-// );
-
   } catch (err) {
     console.error("Decrease qty failed", err);
   }
@@ -254,11 +244,6 @@ const removeItem = async (item) => {
       cart_item_id: item.id,
     });
     await refreshCart();
-//     localStorage.setItem(
-//   "cartCount",
-//   res.summary?.total_items || 0
-// );
-
   } catch (err) {
     console.error("Remove item failed", err);
   }
@@ -1065,4 +1050,4 @@ const isRedeemDisabled = !canUseRedeemPoints || isPromoApplied;
     </div>
   </div>
 );
-}
+}  

@@ -76,22 +76,38 @@ export default function RestaurantPage() {
 
   // ---------- Demo data ----------
    
-  const mapMenuItem = (item) => {
+ // ✅ Backend → UI menu mapper (UPDATED for new API response)
+const mapMenuItem = (item) => {
+  const originalPrice = Number(item.menu_price);
+  const discountedPrice = Number(item.discounted_price || item.menu_price);
+
   return {
-    id: item.menu_id,                 // 🔑 REQUIRED
-    name: item.name,
-    price: item.price,
-    originalPrice: item.actual_price || item.price,
-    quantity: item.quantity || 0,     // 🔥 THIS FIXES YOUR QUANTITY ISSUE
-    img: item.image || null,
-    veg: item.food === "veg",
-    desc: item.description || "",
-    rating: item.rating || 0,
-    hasDiscount:
-      item.actual_price &&
-      item.actual_price > item.price,
+    id: item.menu_id,
+
+    // ✅ names & description
+    name: item.menu_name,
+    desc: item.menu_description || "",
+
+    // ✅ pricing
+    price: discountedPrice,
+    originalPrice,
+    hasDiscount: discountedPrice < originalPrice,
+
+    // ✅ quantity (VERY IMPORTANT)
+    quantity: Number(item.quantity || 0),
+
+    // ✅ veg / non-veg
+    veg: item.is_veg === true,
+
+    // ✅ image
+    img: item.menu_image || null,
+
+    // ✅ optional / UI-only
+    label: item.label || "",
+    rating: null, // backend not sending rating yet
   };
 };
+
 
   // ---------- Load restaurant + menu ----------
   useEffect(() => {
@@ -148,17 +164,6 @@ export default function RestaurantPage() {
 }, [id]);
 
  
-const syncCartCount = async () => {
-  try {
-    const res = await goToCartApi();
-    if (!res?.status) return;
-
-    localStorage.setItem(
-      "cartCount",
-      res.summary?.total_items || 0
-    );
-  } catch {}
-};
 
 
   // persist cart to localStorage
@@ -226,13 +231,10 @@ const goToCart = async () => {
 
 const addToCart = async (item) => {
   await addToCartApi({
-  menuIds: [item.id],
-  productIds: [],
-  quantity: item.quantity + 1,
-});
-
-await syncCartCount();
-
+    menuIds: [item.id],
+    productIds: [],
+    quantity: item.quantity + 1,
+  });
 
   const res = await getMerchantMenu(id);
 
@@ -294,12 +296,10 @@ const removeOne = async (item) => {
   if (item.quantity <= 0) return;
 
   await addToCartApi({
-  menuIds: [item.id],
-  productIds: [],
-  quantity: item.quantity - 1,
-});
-
-await syncCartCount();
+    menuIds: [item.id],
+    productIds: [],
+    quantity: item.quantity - 1,
+  });
 
   const res = await getMerchantMenu(id);
 setRestaurantData(prev => ({
@@ -693,4 +693,4 @@ const cartTotal = allItems.reduce(
 
     </div>
   );
-}
+}  // ✅ 
