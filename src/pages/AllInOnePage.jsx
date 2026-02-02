@@ -18,11 +18,25 @@ import {
   Truck,
   Tag,
 } from "lucide-react";
+import {
+  getGroceryList,
+  getSnackList,
+  getMedicalList,
+  getPetEssentialsList,
+  getPartyEssentialsList,
+} from "../services/allInOneApi";
+
 
 export default function AllInOnePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+
+  const [groceries, setGroceries] = useState([]);
+  const [snacks, setSnacks] = useState([]);
+  const [medical, setMedical] = useState([]);
+  const [pets, setPets] = useState([]);
+  const [party, setParty] = useState([]);
 
   // ADD THIS:
 const [sosOpen, setSosOpen] = useState(false); // false = collapsed by default
@@ -49,33 +63,64 @@ const [sosOpen, setSosOpen] = useState(false); // false = collapsed by default
   ],
 },
 
-      {
-        id: "groceries-kitchen",
-        title: "Groceries & Kitchen",
-        items: [
-          "Fruits & Vegetables",
-          "Bread & Bakery",
-          "Atta, Rice, Oils & Dals",
-          "Meat, Fish & Eggs",
-          "Masala & Dry Fruits",
-          "Breakfast, Sauces & Cereals",
-          "Packaged Food",
-        ].map((n) => ({ name: n })),
-      },
+ {
+      id: "groceries-kitchen",
+      title: "Groceries & Kitchen",
+      items: groceries.map((g) => ({
+        name: g.name,
+        image: g.image,
+        subcategory: g.subcategory,
+        type: "grocery",
+      })),
+    },
 
-      {
-        id: "snacks-drinks",
-        title: "Snacks & Drinks",
-        items: [
-          "Tea, Coffee & More",
-          "Ice Creams & More",
-          "Frozen Food",
-          "Sweet Cravings",
-          "Cold Drink & Juices",
-          "Munchies",
-          "Biscuits & Cookies",
-        ].map((n) => ({ name: n })),
-      },
+    {
+      id: "snacks-drinks",
+      title: "Snacks & Drinks",
+      items: snacks.map((s) => ({
+        name: s.name,
+        image: s.image,
+        subcategory: s.subcategory,
+        type: "snack",
+      })),
+    },
+
+    {
+      id: "medical-health",
+      title: "Medical & Health",
+      items: medical.map((m) => ({
+        name: m.name,
+        image: m.image,
+        subcategory: m.subcategory,
+        type: "medical",
+      })),
+    },
+
+    {
+      id: "pet-essentials",
+      title: "Pet Essentials",
+      items: pets.map((p) => ({
+        name: p.name,
+        image: p.image,
+        subcategory: p.subcategory,
+        type: "pet",
+      })),
+    },
+
+    {
+      id: "events-party",
+      title: "Events & Party Essentials",
+      items: party.map((p) => ({
+        name: p.name,
+        image: p.image,
+        subcategory: p.subcategory,
+        type: "party",
+      })),
+    },
+
+
+
+      
 
       {
         id: "print-services",
@@ -87,46 +132,8 @@ const [sosOpen, setSosOpen] = useState(false); // false = collapsed by default
           "Lamination",
           "Spiral Binding",
         ].map((n) => ({ name: n })),
-      },
-
-      {
-        id: "medical-health",
-        title: "Medical & Health",
-        items: [
-          "Medicines & First Aid",
-          "Thermometer, BP Monitor & More ",
-          "Sanitary Pads & Diapers",
-          "Health Drinks & Protein Supplements",
-          "Baby Cares",
-        ].map((n) => ({ name: n })),
-      },
-
-      {
-        id: "pet-essentials",
-        title: "Pet Essentials",
-        items: [
-          "Dog Food",
-          "Cat Food",
-          "Treats",
-          "Litter",
-          "Pet Grooming",
-          "Pet Accessories",
-        ].map((n) => ({ name: n })),
-      },
- {
-        id: "events-party",
-        title: "Events & Party Essentials",
-        items: [
-          "Balloons & Party Decoration",
-          "Birthday Banners",
-          "Candle Packs",
-          "Disposable Plates & Cups",
-          "Return Gifts",
-          "Helium Balloons",
-          "Celebration Cakes",
-        ].map((n) => ({ name: n })),
-      },
-
+      }, 
+      
       {
         id: "bills-recharge",
         title: "Bills & Recharge",
@@ -155,14 +162,49 @@ const [sosOpen, setSosOpen] = useState(false); // false = collapsed by default
       },
 
      ],
-    []
+    [groceries, snacks, medical, pets, party]
   );
 
+  
+  // useEffect(() => {
+  //   // shimmer simulation
+  //   const t = setTimeout(() => setLoading(false), 600);
+  //   return () => clearTimeout(t);
+  // }, []);
+
   useEffect(() => {
-    // shimmer simulation
-    const t = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(t);
-  }, []);
+  const fetchAll = async () => {
+    try {
+      setLoading(true);
+
+      const [
+        groceryRes,
+        snackRes,
+        medicalRes,
+        petRes,
+        partyRes,
+      ] = await Promise.all([
+        getGroceryList(),
+        getSnackList(),
+        getMedicalList(),
+        getPetEssentialsList(),
+        getPartyEssentialsList(),
+      ]);
+
+      if (groceryRes?.status) setGroceries(groceryRes.data || []);
+      if (snackRes?.status) setSnacks(snackRes.data || []);
+      if (medicalRes?.status) setMedical(medicalRes.data || []);
+      if (petRes?.status) setPets(petRes.data || []);
+      if (partyRes?.status) setParty(partyRes.data || []);
+    } catch (err) {
+      console.error("All-in-one fetch failed", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchAll();
+}, []);
 
   // flatten items for potential autosuggest or search detail (safe)
   const flatItems = useMemo(
@@ -467,15 +509,27 @@ else if (sec.id === "home-services") {
 else if (it.name.toLowerCase().includes("birthday banner")) {
         navigate("/print-services", { state: { activeTab: "banner" } });
       } 
+else if (it.subcategory) {
+  navigate(
+    `/subcategory/${it.subcategory}`,
+    {
+      state: {
+        name: it.name,
+        type: it.type,
+      },
+    }
+  );
+}
 else {
-            navigate(`/category/${encodeURIComponent(it.name)}`);
-          }
+  navigate(`/category/${encodeURIComponent(it.name)}`);
+}
+
         }}
         className="bg-white rounded-2xl shadow-sm p-3 flex flex-col items-center cursor-pointer hover:shadow-md transition"
       >
         <div className="w-20 h-20 rounded-xl mb-2 overflow-hidden">
           <img
-            src={IMAGE_MAP[it.name] || "/Images/default.png"}
+           src={it.image || IMAGE_MAP[it.name] || "/Images/default.png"}
             alt={it.name}
             className="w-full h-full object-cover"
           />

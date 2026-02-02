@@ -27,6 +27,7 @@ import BillsRechargePage from "./pages/BillsRechargePage";
 import HomeServicesPage from "./pages/HomeServicesPage";
 import GroomingWellnessPage from "./pages/GroomingWellnessPage";
 import AllOrdersPage from "./pages/AllOrdersPage"
+import SubCategoryPage from "./pages/SubCategoryPage";
 
 import RewardsPage from "./pages/RewardsPage";
 import DailyLoginPage from "./pages/DailyLoginPage";
@@ -71,6 +72,7 @@ export default function App() {
       <Route path="/category/:name" element={<CategoryPage />} />
       <Route path="/restaurant/:id" element={<RestaurantPage />} />
       <Route path="/product/:id" element={<ProductPage />} />
+      <Route path="/subcategory/:id" element={<SubCategoryPage />} />
 
       <Route path="/category/:name" element={<ProtectedRoute><CategoryPage/></ProtectedRoute>} />
       <Route path="/product/:category/:id" element={<ProtectedRoute><ProductPage/></ProtectedRoute>} />
