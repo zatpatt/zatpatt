@@ -1,4 +1,5 @@
 // src/pages/AllInOnePage.jsx
+
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -24,6 +25,8 @@ import {
   getMedicalList,
   getPetEssentialsList,
   getPartyEssentialsList,
+  getHomeServicesList,        // ✅ ADD
+  getGroomingServicesList,    // ✅ ADD
 } from "../services/allInOneApi";
 
 
@@ -37,9 +40,36 @@ export default function AllInOnePage() {
   const [medical, setMedical] = useState([]);
   const [pets, setPets] = useState([]);
   const [party, setParty] = useState([]);
+  const [homeServices, setHomeServices] = useState([]);
+  const [grooming, setGrooming] = useState([]);
 
   // ADD THIS:
 const [sosOpen, setSosOpen] = useState(false); // false = collapsed by default
+
+// LOCATION STATE
+const [showLocationModal, setShowLocationModal] = useState(() => {
+  const lat = localStorage.getItem("userLat");
+  const lng = localStorage.getItem("userLng");
+  const searchedLocation = localStorage.getItem("searchedLocation");
+  return !(lat && lng) && !searchedLocation;
+});
+
+const requestLocation = () => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        localStorage.setItem("userLat", latitude);
+        localStorage.setItem("userLng", longitude);
+        localStorage.removeItem("searchedLocation");
+        setShowLocationModal(false);
+      },
+      () => {
+        alert("Location permission denied");
+      }
+    );
+  }
+};
 
   // --- MASTER DATA (your requested categories + SOS contacts) ---
   const MASTER = useMemo(
@@ -143,26 +173,28 @@ const [sosOpen, setSosOpen] = useState(false); // false = collapsed by default
       {
         id: "home-services",
         title: "Home Services — Repairs & More",
-        items: [
-          "Electrician / Plumber / Carpenter",
-          "Mobile Repair",
-          "AC / Cooler Repair",
-          "Water Purifier / Geyser Repair",
-          "Refrigerator / TV / Washing Machine Repair",
-          "Inverter & Battery Repair",
-          "Pest Control",
-          "Painting Services",
-        ].map((n) => ({ name: n })),
+        items: homeServices.map((h) => ({
+          name: h.name,
+          image: h.image,
+          subcategory: h.subcategory,
+          type: "service",
+        })),
       },
 
       {
         id: "grooming-wellness",
         title: "Grooming & Wellness",
-        items: ["Salon (Men)", "Beauty & Salon (Women)", "Mehendi Artists"].map((n) => ({ name: n })),
+        items: grooming.map((g) => ({
+          name: g.name,
+          image: g.image,
+          subcategory: g.subcategory,
+          type: "service",
+        })),
       },
 
      ],
-    [groceries, snacks, medical, pets, party]
+   [groceries, snacks, medical, pets, party, homeServices, grooming]
+
   );
 
   
@@ -177,25 +209,31 @@ const [sosOpen, setSosOpen] = useState(false); // false = collapsed by default
     try {
       setLoading(true);
 
-      const [
-        groceryRes,
-        snackRes,
-        medicalRes,
-        petRes,
-        partyRes,
-      ] = await Promise.all([
-        getGroceryList(),
-        getSnackList(),
-        getMedicalList(),
-        getPetEssentialsList(),
-        getPartyEssentialsList(),
-      ]);
+     const [
+    groceryRes,
+    snackRes,
+    medicalRes,
+    petRes,
+    partyRes,
+    homeRes,
+    groomingRes,
+  ] = await Promise.all([
+    getGroceryList(),
+    getSnackList(),
+    getMedicalList(),
+    getPetEssentialsList(),
+    getPartyEssentialsList(),
+    getHomeServicesList(),        // ✅
+    getGroomingServicesList(),    // ✅
+  ]);
 
-      if (groceryRes?.status) setGroceries(groceryRes.data || []);
-      if (snackRes?.status) setSnacks(snackRes.data || []);
-      if (medicalRes?.status) setMedical(medicalRes.data || []);
-      if (petRes?.status) setPets(petRes.data || []);
-      if (partyRes?.status) setParty(partyRes.data || []);
+  if (groceryRes?.status) setGroceries(groceryRes.data || []);
+  if (snackRes?.status) setSnacks(snackRes.data || []);
+  if (medicalRes?.status) setMedical(medicalRes.data || []);
+  if (petRes?.status) setPets(petRes.data || []);
+  if (partyRes?.status) setParty(partyRes.data || []);
+  if (homeRes?.status) setHomeServices(homeRes.data || []);
+  if (groomingRes?.status) setGrooming(groomingRes.data || []);
     } catch (err) {
       console.error("All-in-one fetch failed", err);
     } finally {
@@ -205,6 +243,15 @@ const [sosOpen, setSosOpen] = useState(false); // false = collapsed by default
 
   fetchAll();
 }, []);
+
+useEffect(() => {
+  if (showLocationModal) {
+    document.body.style.overflow = "hidden";
+  } else {
+    document.body.style.overflow = "auto";
+  }
+}, [showLocationModal]);
+
 
   // flatten items for potential autosuggest or search detail (safe)
   const flatItems = useMemo(
@@ -293,7 +340,7 @@ const IMAGE_MAP = {
   "Spiral Binding": "/Images/Spiral-Binding.png",
 
   "Medicines & First Aid": "/Images/Medicines-First-Aid.png",
-  "Thermometer, BP Monitor & More ": "/Images/Health-Drinks-Protein-Supplements.png",
+  "Thermometer, BP Monitor & More": "/Images/Thermometer-BP-Monitor-More.png",
   "Sanitary Pads & Diapers": "/Images/Sanitary-Pads-Diapers.png",
   "Health Drinks & Protein Supplements": "/Images/Health-Drinks-Protein-Supplements.png",
   "Baby Cares": "/Images/Baby-Cares.png",
@@ -331,10 +378,82 @@ const IMAGE_MAP = {
   "Mehendi Artists": "/Images/Mehendi-Artists.png",
 };
 
+
+if (showLocationModal) {
   return (
     <div className="min-h-screen bg-[#fff9f4]">
+      {/* LOCATION BLOCK SCREEN */}
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
+        <div className="bg-white w-full rounded-t-3xl p-6 shadow-xl">
+          <div className="w-12 h-1 bg-gray-300 mx-auto rounded-full mb-6"></div>
+
+          <div className="text-center">
+            <div className="text-5xl mb-4">📍</div>
+            <h2 className="text-xl font-bold mb-2">
+              Location permission is required
+            </h2>
+
+            <button
+              onClick={requestLocation}
+              className="w-full bg-orange-500 text-white py-3 rounded-xl font-semibold mb-3"
+            >
+              Enable device location
+            </button>
+
+            <button
+              onClick={() => navigate("/address")}
+              className="w-full border border-gray-300 py-3 rounded-xl text-gray-700"
+            >
+              Enter location manually
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+  return (
+    <div className="min-h-screen bg-[#fff9f4]">
+
+      {/* {showLocationModal && (
+  <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
+    <div className="bg-white w-full rounded-t-3xl p-6 shadow-xl animate-slideUp">
+      <div className="w-12 h-1 bg-gray-300 mx-auto rounded-full mb-6"></div>
+
+      <div className="text-center">
+        <div className="text-5xl mb-4">📍</div>
+
+        <h2 className="text-xl font-bold mb-2">
+          Location permission is off
+        </h2>
+
+        <p className="text-gray-500 text-sm mb-6">
+          Please enable location permission for better delivery experience
+        </p>
+
+        <button
+          onClick={requestLocation}
+          className="w-full bg-orange-500 text-white py-3 rounded-xl font-semibold mb-3"
+        >
+          Enable device location
+        </button>
+
+       <button
+        onClick={() => navigate("/address")}
+        className="w-full border border-gray-300 py-3 rounded-xl text-gray-700"
+      >
+        Enter location manually
+      </button>
+      </div>
+    </div>
+  </div>
+)} */}
+
       {/* Header */}
       <header className="bg-orange-500 text-white py-4 px-6 shadow-md flex items-center">
+        {/* LOCATION BOTTOM SHEET */}
+       
         <button onClick={() => navigate(-1)} className="mr-3 bg-white text-orange-500 p-2 rounded-full">
           <ArrowLeft size={18} />
         </button>
@@ -479,47 +598,65 @@ const IMAGE_MAP = {
             navigate("/print-services", { state: { activeTab: tab } });
           } 
 
-else if (sec.id === "grooming-wellness") { // keep print logic too if needed
-            let tab = "salon-men";
-            const name = it.name.toLowerCase();
-            if (name.includes("beauty") || name.includes("women")) tab = "beauty-salon-women";
-            else if (name.includes("mehendi") || name.includes("artists")) tab = "mehendi-artists";
+// else if (sec.id === "grooming-wellness") { // keep print logic too if needed
+//             let tab = "salon-men";
+//             const name = it.name.toLowerCase();
+//             if (name.includes("beauty") || name.includes("women")) tab = "beauty-salon-women";
+//             else if (name.includes("mehendi") || name.includes("artists")) tab = "mehendi-artists";
 
-            navigate("/grooming-wellness", { state: { activeTab: tab } });
-          } 
+//             navigate("/grooming-wellness", { state: { activeTab: tab } });
+//           } 
 
-else if (sec.id === "home-services") {
-  let tab = "mobile-repair"; // default
- const name = it.name.toLowerCase();
- if (name.includes("mobilerepair")) tab = "mobile-repair";
- else if (name.includes("fridge") || name.includes("tv") || name.includes("washing") || name.includes("machine"))
-    tab = "refrigerator-tv-washing-machine-repair";
-            else if (name.includes("ac") || name.includes("cooler")) tab = "ac-cooler-repair";
-            else if (name.includes("purifier") || name.includes("geyser") || name.includes("water") || name.includes("heater"))
-    tab = "water-purifier-geyser-repair";
+// else if (sec.id === "home-services") {
+//   let tab = "mobile-repair"; // default
+//  const name = it.name.toLowerCase();
+//  if (name.includes("mobilerepair")) tab = "mobile-repair";
+//  else if (name.includes("fridge") || name.includes("tv") || name.includes("washing") || name.includes("machine"))
+//     tab = "refrigerator-tv-washing-machine-repair";
+//             else if (name.includes("ac") || name.includes("cooler")) tab = "ac-cooler-repair";
+//             else if (name.includes("purifier") || name.includes("geyser") || name.includes("water") || name.includes("heater"))
+//     tab = "water-purifier-geyser-repair";
             
-            else if (name.includes("inverter") || name.includes("battery")) tab = "inverter-battery-repair";
-            else if (name.includes("pest")) tab = "pest-control";
-           else if (name.includes("paint")) tab = "painting-services";
-           else if (name.includes("electrician") || name.includes("plumber") || name.includes("carpenter"))
-    tab = "electrician-plumber-carpenter";
+//             else if (name.includes("inverter") || name.includes("battery")) tab = "inverter-battery-repair";
+//             else if (name.includes("pest")) tab = "pest-control";
+//            else if (name.includes("paint")) tab = "painting-services";
+//            else if (name.includes("electrician") || name.includes("plumber") || name.includes("carpenter"))
+//     tab = "electrician-plumber-carpenter";
 
-  navigate("/home-services", { state: { activeTab: tab } });
+//   navigate("/home-services", { state: { activeTab: tab } });
+// }
+// else if (it.name.toLowerCase().includes("birthday banner")) {
+//         navigate("/print-services", { state: { activeTab: "banner" } });
+//       } 
+// else if (it.subcategory) {
+//   navigate(`/subcategory/${it.subcategory}`, {
+//     state: {
+//       name: it.name,
+//       type: it.type, // "service" or "grocery"
+//     },
+//   });
+// }
+
+
+else if (it.type === "service") {
+  navigate(`/services/${it.subcategory}`, {
+    state: {
+      name: it.name,
+      type: "service",
+    },
+  });
 }
-else if (it.name.toLowerCase().includes("birthday banner")) {
-        navigate("/print-services", { state: { activeTab: "banner" } });
-      } 
-else if (it.subcategory) {
-  navigate(
-    `/subcategory/${it.subcategory}`,
-    {
-      state: {
-        name: it.name,
-        type: it.type,
-      },
-    }
-  );
+
+else if (it.type === "grocery" || it.type === "snack" || it.type === "medical" || it.type === "pet" || it.type === "party") {
+  navigate(`/subcategory/${it.subcategory}`, {
+    state: {
+      name: it.name,
+      type: it.type,
+    },
+  });
 }
+
+
 else {
   navigate(`/category/${encodeURIComponent(it.name)}`);
 }

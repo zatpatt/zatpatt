@@ -232,17 +232,13 @@ const { favorites, addFavorite, removeFavorite } = useFavorites();
   // }, []);
 
   // when user searches a locality in the modal
-  const handleSearchLocation = () => {
-    if (!searchLocation) return;
-    localStorage.setItem("searchedLocation", searchLocation.trim());
-    // apply filter to restaurants by location EXACT match (case-insensitive)
-    const nearby = restaurants.filter(
-      (r) => r.location.toLowerCase() === searchLocation.trim().toLowerCase()
-    );
-    setNearbyRestaurants(nearby);
-    setShowLocationModal(false);
-    setLocationGranted(false); // since using manual search location
-  };
+ const handleSearchLocation = () => {
+  if (!searchLocation) return;
+
+  localStorage.setItem("searchedLocation", searchLocation.trim());
+  setShowLocationModal(false);
+};
+
 
   // apply location filter (helper used after GPS grant or change)
   const applyLocationFilterFromStorage = () => {
@@ -309,10 +305,18 @@ const { favorites, addFavorite, removeFavorite } = useFavorites();
   const displayLocation = storedSearched || (locationGranted ? "Current GPS" : "");
 
   useEffect(() => {
-    if (!getAccessToken()) {
-      navigate("/");
-    }
-  }, []);
+  if (!getAccessToken()) {
+    navigate("/");
+  }
+}, [navigate]);
+
+useEffect(() => {
+  if (showLocationModal) {
+    document.body.style.overflow = "hidden";
+  } else {
+    document.body.style.overflow = "auto";
+  }
+}, [showLocationModal]);
 
   
   return (
@@ -336,7 +340,7 @@ const { favorites, addFavorite, removeFavorite } = useFavorites();
       </header>
 
       {/* ---------- Location Modal with Search ---------- */}
-      {showLocationModal && (
+      {/* {showLocationModal && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -382,7 +386,52 @@ const { favorites, addFavorite, removeFavorite } = useFavorites();
             </div>
           </motion.div>
         </motion.div>
-      )}
+      )} */}
+
+{showLocationModal && (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    className="fixed inset-0 bg-black/50 z-50 flex items-end"
+  >
+    <motion.div
+      initial={{ y: 400 }}
+      animate={{ y: 0 }}
+      transition={{ type: "spring", stiffness: 120 }}
+      className="bg-white w-full rounded-t-3xl p-6 shadow-xl"
+    >
+      {/* Drag Indicator */}
+      <div className="w-12 h-1 bg-gray-300 mx-auto rounded-full mb-6"></div>
+
+      <div className="text-center">
+        <div className="text-5xl mb-4">📍</div>
+
+        <h2 className="text-xl font-bold mb-2">
+          Location permission is off
+        </h2>
+
+        <p className="text-gray-500 text-sm mb-6">
+          Please enable location permission for better delivery experience
+        </p>
+
+        <button
+          onClick={requestLocation}
+          className="w-full bg-orange-500 text-white py-3 rounded-xl font-semibold mb-3"
+        >
+          Enable device location
+        </button>
+
+        <button
+        onClick={() => navigate("/address")}
+        className="w-full border border-gray-300 py-3 rounded-xl text-gray-700"
+      >
+        Enter location manually
+      </button>
+      </div>
+    </motion.div>
+  </motion.div>
+)}
+
 
       {/* ---------- Offer Slider ---------- */}
       <div className="my-3 mx-3 rounded-lg overflow-hidden shadow">
@@ -433,8 +482,8 @@ const { favorites, addFavorite, removeFavorite } = useFavorites();
             <input
             type="text"
             placeholder="Search restaurant..."
-            value={searchLocation}
-            onChange={(e) => setSearchLocation(e.target.value)}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
             className="border border-gray-300 rounded-xl p-3 w-full mb-3"
           />
 

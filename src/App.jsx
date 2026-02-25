@@ -1,4 +1,5 @@
 //src\App.jsx
+
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
@@ -28,6 +29,7 @@ import HomeServicesPage from "./pages/HomeServicesPage";
 import GroomingWellnessPage from "./pages/GroomingWellnessPage";
 import AllOrdersPage from "./pages/AllOrdersPage"
 import SubCategoryPage from "./pages/SubCategoryPage";
+import ServiceListPage from "./pages/ServiceListPage";
 
 import RewardsPage from "./pages/RewardsPage";
 import DailyLoginPage from "./pages/DailyLoginPage";
@@ -45,6 +47,8 @@ import OrderTrackingPage from "./pages/OrderTrackingPage";
 import AfterDeliveryPage from "./pages/AfterDeliveryPage";
 import RestaurantsPage from "./pages/RestaurantPage.jsx";
 
+import LocationGuard from "./components/LocationGuard";
+
 function ProtectedRoute({ children }) {
   const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
   return isLoggedIn ? children : <Navigate to="/" replace />;
@@ -59,7 +63,8 @@ export default function App() {
       <Route path="/otp" element={<OtpPage />} />
 
       {/* Protected Routes */}
-      <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+      <Route path="/home" element={<LocationGuard> <HomePage /> </LocationGuard>} />
+      <Route path="/allinone" element={<LocationGuard> <AllInOnePage /> </LocationGuard>} />
 
       {/* Search */}
       <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
@@ -73,6 +78,7 @@ export default function App() {
       <Route path="/restaurant/:id" element={<RestaurantPage />} />
       <Route path="/product/:id" element={<ProductPage />} />
       <Route path="/subcategory/:id" element={<SubCategoryPage />} />
+      <Route path="/services/:id" element={<ProtectedRoute><ServiceListPage /></ProtectedRoute>} />
 
       <Route path="/category/:name" element={<ProtectedRoute><CategoryPage/></ProtectedRoute>} />
       <Route path="/product/:category/:id" element={<ProtectedRoute><ProductPage/></ProtectedRoute>} />
@@ -103,7 +109,7 @@ export default function App() {
       <Route path="/allorders" element={<AllOrdersPage />} />
 
       {/* Semi-protected */}
-      <Route path="/allinone" element={<AllInOnePage />} />
+      {/* <Route path="/allinone" element={<AllInOnePage />} /> */}
       <Route path="/leaderboard" element={<LeaderboardPage />} />
       <Route path="/address" element={<AddressPage />} />
 

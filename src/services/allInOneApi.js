@@ -1,4 +1,5 @@
 // src/services/allInOneApi.js
+
 import api from "./api";
 
 // Groceries
@@ -28,5 +29,35 @@ export const getPetEssentialsList = async () => {
 // Party Essentials
 export const getPartyEssentialsList = async () => {
   const res = await api.get("/api/v1/common/orders/party-ess-list/");
+  return res.data;
+};
+
+// Products by subcategory
+export const getProductsBySubcategory = async (subcategoryId) => {
+  const res = await api.post(
+    "/api/v1/common/orders/list-product/",
+    { subcategory: subcategoryId }
+  );
+  return res.data;
+};
+
+// Home Services
+export const getHomeServicesList = async () => {
+  const res = await api.get("/api/v1/common/orders/home-services-list/");
+  return res.data;
+};
+
+// Grooming Services
+export const getGroomingServicesList = async () => {
+  const res = await api.get("/api/v1/common/orders/grooming-services-list/");
+  return res.data;
+};
+
+// Services by subcategory
+export const getServicesBySubcategory = async (subcategoryId) => {
+  const res = await api.post(
+    "/api/v1/common/orders/list-services/",
+    { subcategory: subcategoryId }
+  );
   return res.data;
 };
