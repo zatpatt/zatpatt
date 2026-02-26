@@ -12,6 +12,7 @@ import {
 import { getAddressList } from "../services/addressApi";
 import { getPromoCodes } from "../services/promoApi";
 import { initiatePaymentApi } from "../services/paymentApi";
+import { newCartListApi } from "../services/allInOneCartApi";
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -128,16 +129,31 @@ const refreshCart = async ({
   points = selectedPoints,
   promo = appliedPromo,
   tip = deliveryTip,
-  donationAmount = donation,
 } = {}) => {
 
-  const res = await getCartList({
-    address_id: savedAddress?.address_id || null,
-    use_points: points,
-    code: promo,
-    tip,
-    donation: donationAmount, // ✅ ADD THIS
-  });
+  const cartType = localStorage.getItem("cartType");
+
+  if (!savedAddress?.address_id) return;
+
+  let res;
+
+  if (cartType === "qc") {
+    // 🔵 QC FLOW
+    res = await newCartListApi({
+      address_id: savedAddress.address_id,
+      use_points: points,
+      tip,
+      code: promo,
+    });
+  } else {
+    // 🟠 RESTAURANT FLOW
+    res = await getCartList({
+      address_id: savedAddress.address_id,
+      use_points: points,
+      tip,
+      code: promo,
+    });
+  }
 
   if (!res?.status) return;
 
@@ -145,18 +161,22 @@ const refreshCart = async ({
   setPromoInfo(res.promo || null);
   setCartSummary(res.summary || null);
 
-  setCartItems(res.items.map(i => ({
-    id: i.cart_item_id,
-    name: i.name,
-    image: i.image,
-    actualPrice: i.actual_price,
-    unitPrice: i.unit_price,
-    quantity: i.quantity,
-    total: i.total_price,
-    type: i.type,
-  })));
+  setCartItems(
+    (res.items || []).map((i) => ({
+      id: i.cart_item_id,
+      name: i.name,
+      image: i.image,
+      unitPrice: i.unit_price,
+      quantity: i.quantity,
+      total: i.total_price,
+      type: i.type,
+    }))
+  );
 
   setDeliveryFee(res.delivery?.delivery_fee ?? 0);
+  setDistanceKm(res.delivery?.distance_km ?? 0);
+  setIsServiceable(res.delivery?.is_serviceable ?? true);
+  setServiceMessage(res.delivery?.message ?? "");
 };
 
 useEffect(() => {
@@ -212,29 +232,39 @@ useEffect(() => {
 }, [location]);
 
 const increaseQty = async (item) => {
-  try {
+  const cartType = localStorage.getItem("cartType");
+
+  if (cartType === "qc") {
+    await newAddToCartApi({
+      productIds: [item.id],
+      quantity: item.quantity + 1,
+    });
+  } else {
     await updateCartApi({
       cart_item_id: item.id,
       quantity: item.quantity + 1,
     });
-    await refreshCart();
-  } catch (err) {
-    console.error("Increase qty failed", err);
   }
+
+  await refreshCart();
 };
 
 const decreaseQty = async (item) => {
-  if (item.quantity <= 1) return;
+  const cartType = localStorage.getItem("cartType");
 
-  try {
+  if (cartType === "qc") {
+    await newAddToCartApi({
+      productIds: [item.id],
+      quantity: item.quantity - 1,
+    });
+  } else {
     await updateCartApi({
       cart_item_id: item.id,
       quantity: item.quantity - 1,
     });
-    await refreshCart();
-  } catch (err) {
-    console.error("Decrease qty failed", err);
   }
+
+  await refreshCart();
 };
 
 
@@ -251,60 +281,72 @@ const removeItem = async (item) => {
 
 
 useEffect(() => {
-  const fetchCart = async () => {
-    try {
-      setLoading(true);
+  if (!savedAddress?.address_id) return;
 
-     const res = await getCartList({
-  address_id: savedAddress?.address_id || null,
-  use_points: selectedPoints || 0,
-  code: appliedPromo || null,
-});
+  setLoading(true);
 
+  refreshCart().finally(() => {
+    setLoading(false);
+  });
 
-      if (!res || !res.status) return;
-      setPointsInfo(res.points || null);
-      setPromoInfo(res.promo || null);
-
-      // ✅ Always show cart
-      setCartItems(
-        (res.items || []).map((i) => ({
-          id: i.cart_item_id,
-          name: i.name,
-          image: i.image,
-          actualPrice: i.actual_price,
-          unitPrice: i.unit_price,
-          quantity: i.quantity,
-          total: i.total_price,
-          type: i.type,
-        }))
-      );
-
-      setCartSummary(res.summary || null);
-
-      const delivery = res.delivery || {};
-
-      setDeliveryFee(delivery.delivery_fee ?? 0);
-      setDistanceKm(delivery.distance_km ?? 0);
-
-      if (delivery.is_serviceable === false) {
-        setIsServiceable(false);
-        setServiceMessage(
-          delivery.message || "This location is not serviceable."
-        );
-      } else {
-        setIsServiceable(true);
-        setServiceMessage("");
-      }
-    } catch (err) {
-      console.error("Cart fetch error", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchCart();
 }, [savedAddress]);
+
+
+// useEffect(() => {
+//   const fetchCart = async () => {
+//     try {
+//       setLoading(true);
+
+//      const res = await getCartList({
+//   address_id: savedAddress?.address_id || null,
+//   use_points: selectedPoints || 0,
+//   code: appliedPromo || null,
+// });
+
+
+//       if (!res || !res.status) return;
+//       setPointsInfo(res.points || null);
+//       setPromoInfo(res.promo || null);
+
+//       // ✅ Always show cart
+//       setCartItems(
+//         (res.items || []).map((i) => ({
+//           id: i.cart_item_id,
+//           name: i.name,
+//           image: i.image,
+//           actualPrice: i.actual_price,
+//           unitPrice: i.unit_price,
+//           quantity: i.quantity,
+//           total: i.total_price,
+//           type: i.type,
+//         }))
+//       );
+
+//       setCartSummary(res.summary || null);
+
+//       const delivery = res.delivery || {};
+
+//       setDeliveryFee(delivery.delivery_fee ?? 0);
+//       setDistanceKm(delivery.distance_km ?? 0);
+
+//       if (delivery.is_serviceable === false) {
+//         setIsServiceable(false);
+//         setServiceMessage(
+//           delivery.message || "This location is not serviceable."
+//         );
+//       } else {
+//         setIsServiceable(true);
+//         setServiceMessage("");
+//       }
+//     } catch (err) {
+//       console.error("Cart fetch error", err);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   fetchCart();
+// }, [savedAddress]);
 
 const applyPromo = async () => {
   if (!selectedPromo) return alert("Select a promo code");

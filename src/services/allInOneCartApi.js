@@ -41,8 +41,8 @@ export const goToCartApi = async () => {
 /* ---------------- NEW CART LIST (FINAL PAGE) ---------------- */
 
 export const newCartListApi = async ({
-  addressId,
-  usePoints = 0,
+  address_id,
+  use_points = 0,
   tip = 0,
   code = "",
 }) => {
@@ -50,10 +50,10 @@ export const newCartListApi = async ({
     const res = await api.post(
       "/api/v1/common/orders/new-cart-list/",
       {
-        address_id: addressId,
-        use_points: usePoints,
-        tip: tip,
-        code: code,
+        address_id,
+        use_points,
+        tip,
+        code,
       }
     );
 

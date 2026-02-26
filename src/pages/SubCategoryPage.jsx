@@ -18,12 +18,16 @@ export default function SubCategoryPage() {
 
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
-  const [cart, setCart] = useState({});
-  const totalItems = Object.values(cart).reduce(
-  (sum, qty) => sum + qty,
-  0
-  );
+  // const [cart, setCart] = useState({});
+  // const totalItems = Object.values(cart).reduce(
+  // (sum, qty) => sum + qty,
+  // 0
+  // );
   // const [cartType, setCartType] = useState(null);
+const totalItems = products.reduce(
+  (sum, item) => sum + (item.quantity || 0),
+  0
+);
 
 const fallbackImage =
   "https://images.unsplash.com/photo-1542838132-92c53300491e";
@@ -134,49 +138,34 @@ const fallbackImage =
 //   refreshCart();
 // }, []);
 
+useEffect(() => {
+  localStorage.setItem("cartType", "qc");
+}, []);
+
 
 const addToCart = async (p) => {
-  const currentQty = cart[p.product_ids] || 0;
-  const newQty = currentQty + 1;
-
-  // ✅ Update frontend immediately
-  setCart((prev) => ({
-    ...prev,
-    [p.product_ids]: newQty,
-  }));
-
-  // ✅ Call backend (no refreshCart)
+  localStorage.setItem("cartType", "qc");   // 👈 ADD THIS
   await newAddToCartApi({
     productIds: [p.product_ids],
-    quantity: newQty,
+    quantity: (p.quantity || 0) + 1,
   });
+
+  // 🔁 Reload products
+  const res = await getProductsBySubcategory(id);
+  if (res?.status) setProducts(res.data || []);
 };
 
 const removeFromCart = async (p) => {
-  const currentQty = cart[p.product_ids] || 0;
+  if ((p.quantity || 0) <= 0) return;
 
-  if (currentQty <= 0) return;
-
-  const newQty = currentQty - 1;
-
-  // ✅ Update frontend immediately
-  setCart((prev) => {
-    const updated = { ...prev };
-
-    if (newQty === 0) {
-      delete updated[p.product_ids];
-    } else {
-      updated[p.product_ids] = newQty;
-    }
-
-    return updated;
-  });
-
-  // ✅ Call backend
   await newAddToCartApi({
     productIds: [p.product_ids],
-    quantity: newQty,
+    quantity: p.quantity - 1,
   });
+
+  // 🔁 Reload products
+  const res = await getProductsBySubcategory(id);
+  if (res?.status) setProducts(res.data || []);
 };
 
 
@@ -201,7 +190,7 @@ const removeFromCart = async (p) => {
         ) : (
           <div className="grid grid-cols-2 gap-4">            
             {products.map((p) => {
-    const qty = cart[p.product_ids] || 0;
+   const qty = p.quantity || 0;
 
   return (
   <div
@@ -279,7 +268,10 @@ const removeFromCart = async (p) => {
     </div>
 
     <button
-      onClick={() => navigate("/cart")}
+  onClick={() => {
+    localStorage.setItem("cartType", "qc");
+    navigate("/cart");
+  }}
       className="px-4 py-2 bg-orange-500 text-white rounded-xl text-sm"
     >
       Go to Cart

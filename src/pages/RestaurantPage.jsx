@@ -230,6 +230,7 @@ const goToCart = async () => {
 };
 
 const addToCart = async (item) => {
+  localStorage.setItem("cartType", "restaurant");   // 👈 ADD THIS
   await addToCartApi({
     menuIds: [item.id],
     productIds: [],
