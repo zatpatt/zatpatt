@@ -44,3 +44,169 @@ body {
 html {
   transition: background-color 0.3s, color 0.3s;
 }
+
+/* ===== DARK MODE GLOBAL OVERRIDE ===== */
+.dark body {
+  background-color: #111827 !important;
+  color: #f9fafb !important;
+}
+
+/* Page backgrounds */
+.dark .bg-white {
+  background-color: #1f2937 !important;
+}
+
+.dark .bg-orange-50 {
+  background-color: #1f2937 !important;
+}
+
+.dark .bg-gray-50 {
+  background-color: #1f2937 !important;
+}
+
+.dark .bg-gradient-to-b {
+  background: linear-gradient(to bottom, #111827, #1f2937) !important;
+}
+
+/* Buttons - keep them visible */
+.dark .bg-gray-100 {
+  background-color: #374151 !important;
+}
+
+.dark .bg-gray-200 {
+  background-color: #4b5563 !important;
+}
+
+.dark .bg-gray-300 {
+  background-color: #6b7280 !important;
+}
+
+/* Text */
+.dark .text-gray-400 { color: #9ca3af !important; }
+.dark .text-gray-500 { color: #9ca3af !important; }
+.dark .text-gray-600 { color: #d1d5db !important; }
+.dark .text-gray-700 { color: #d1d5db !important; }
+.dark .text-gray-800 { color: #f3f4f6 !important; }
+.dark .text-gray-900 { color: #f9fafb !important; }
+.dark .text-black   { color: #f9fafb !important; }
+
+/* Keep orange brand colors */
+.dark .bg-orange-500  { background-color: #f97316 !important; }
+.dark .bg-orange-100  { background-color: #431407 !important; }
+.dark .text-orange-500 { color: #f97316 !important; }
+.dark .text-orange-600 { color: #fb923c !important; }
+.dark .border-orange-500 { border-color: #f97316 !important; }
+.dark .border-orange-200 { border-color: #7c2d12 !important; }
+
+/* Inputs */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #374151 !important;
+  color: #f9fafb !important;
+  border-color: #4b5563 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Borders */
+.dark .border,
+.dark .border-gray-300 {
+  border-color: #4b5563 !important;
+}
+
+/* Shadows */
+.dark .shadow,
+.dark .shadow-md,
+.dark .shadow-lg {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Images slightly dimmed */
+.dark img {
+  filter: brightness(0.85);
+}
+
+/* Modals */
+.dark .bg-black\/50,
+.dark .bg-black\/60 {
+  background-color: rgba(0, 0, 0, 0.75) !important;
+}
+
+/* Header stays orange-dark */
+.dark header {
+  background-color: #c2410c !important;
+}
+
+/* Rounded cards */
+.dark .rounded-xl,
+.dark .rounded-2xl {
+  border-color: #374151;
+}
+
+/* ===== ADDITIONAL DARK MODE FIXES ===== */
+
+/* Catch inline/custom background colors */
+.dark html,
+.dark body,
+.dark #root {
+  background-color: #111827 !important;
+}
+
+/* Catch custom cream/light backgrounds used in your pages */
+.dark [class*="bg-[#"] {
+  background-color: #111827 !important;
+}
+
+/* Home page specific */
+.dark .bg-\[\#fff6ed\] {
+  background-color: #111827 !important;
+}
+
+.dark .bg-\[\#FFF7ED\] {
+  background-color: #111827 !important;
+}
+
+/* Category cards dark background text fix */
+.dark .text-white {
+  color: #ffffff !important;
+}
+
+/* Bottom nav */
+.dark nav,
+.dark footer {
+  background-color: #1f2937 !important;
+  border-top: 1px solid #374151;
+}
+
+/* Bottom nav text */
+.dark nav span,
+.dark nav p {
+  color: #f9fafb !important;
+}
+
+/* Fix offer/banner cards */
+.dark .rounded-2xl,
+.dark .rounded-xl {
+  background-color: #1f2937 !important;
+}
+
+/* Fix any remaining white sections */
+.dark section,
+.dark main,
+.dark div:not([class*="orange"]):not([class*="bg-orange"]) {
+  background-color: inherit;
+}
+
+/* Scrollbar dark */
+.dark ::-webkit-scrollbar {
+  background-color: #1f2937;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: #4b5563;
+  border-radius: 4px;
+}

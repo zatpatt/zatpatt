@@ -8,7 +8,7 @@ export default function LocationGuard({ children }) {
   const locationSet = (lat && lng) || searchedLocation;
 
   if (!locationSet) {
-    return <Navigate to="/enable-location" replace />;
+    return <Navigate to="/address" replace />;
   }
 
   return children;

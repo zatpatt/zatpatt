@@ -31,3 +31,16 @@ export const fetchMyProfile = async () => {
   );
   return res.data;
 };
+
+/**
+ * Update profile details
+ * POST /api/v1/common/orders/edit-profile/
+ */
+export const editProfileApi = async (payload) => {
+  const res = await api.post(
+    "/api/v1/common/orders/edit-profile/",
+    payload
+  );
+
+  return res.data;
+};

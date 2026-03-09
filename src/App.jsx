@@ -1,6 +1,6 @@
 //src\App.jsx
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import OtpPage from "./pages/OtpPage";
@@ -50,11 +50,20 @@ import RestaurantsPage from "./pages/RestaurantPage.jsx";
 import LocationGuard from "./components/LocationGuard";
 
 function ProtectedRoute({ children }) {
-  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
-  return isLoggedIn ? children : <Navigate to="/" replace />;
+  const token = localStorage.getItem("accessToken");
+  return token ? children : <Navigate to="/" replace />;
 }
 
 export default function App() {
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem("darkMode") === "true";
+    if (savedDarkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, []);
+
   return (
     <Routes>
 
@@ -63,7 +72,14 @@ export default function App() {
       <Route path="/otp" element={<OtpPage />} />
 
       {/* Protected Routes */}
-      <Route path="/home" element={<LocationGuard> <HomePage /> </LocationGuard>} />
+      <Route
+  path="/home"
+  element={
+    <ProtectedRoute>
+      <HomePage />
+    </ProtectedRoute>
+  }
+/>
       <Route path="/allinone" element={<LocationGuard> <AllInOnePage /> </LocationGuard>} />
 
       {/* Search */}
@@ -75,7 +91,8 @@ export default function App() {
       <Route path="/book/:name" element={<ProtectedRoute><BookingPage /></ProtectedRoute>} />
       <Route path="/provider/:id" element={<ProtectedRoute><ProviderPage /></ProtectedRoute>} />
       <Route path="/category/:name" element={<CategoryPage />} />
-      <Route path="/restaurant/:id" element={<RestaurantPage />} />
+      
+      <Route path="/restaurant/:id" element={<ProtectedRoute><RestaurantsPage /></ProtectedRoute>} />
       <Route path="/product/:id" element={<ProductPage />} />
       <Route path="/subcategory/:id" element={<SubCategoryPage />} />
       <Route path="/services/:id" element={<ProtectedRoute><ServiceListPage /></ProtectedRoute>} />

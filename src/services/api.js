@@ -21,7 +21,11 @@ api.interceptors.request.use(
   (config) => {
     const accessToken = localStorage.getItem("accessToken");
 
-    if (accessToken) {
+    const isAuthApi =
+      config.url.includes("request-otp") ||
+      config.url.includes("verify-otp");
+
+    if (accessToken && !isAuthApi) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
 
@@ -34,14 +38,19 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      console.warn("Unauthorized or token expired");
+  if (error.response?.status === 401) {
+  console.warn("Token expired");
 
-      // OPTIONAL (recommended)
-     localStorage.removeItem("accessToken");
-     localStorage.removeItem("refreshToken");
-      window.location.href = "/";
-    }
+  const isLoginRequest =
+    error.config.url.includes("request-otp") ||
+    error.config.url.includes("verify-otp");
+
+  if (!isLoginRequest) {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    window.location.href = "/";
+  }
+}
 
     return Promise.reject(error);
   }

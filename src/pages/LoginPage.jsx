@@ -16,6 +16,13 @@ export default function LoginPage() {
   const [errors, setErrors] = useState({});
   const [isFormValid, setIsFormValid] = useState(false);
 
+  
+useEffect(() => {
+  if (localStorage.getItem("accessToken")) {
+    navigate("/home", { replace: true });
+  }
+}, []); // ✅ runs once on mount only
+
   /* ---------------- VALIDATION ---------------- */
   useEffect(() => {
     const newErrors = {};

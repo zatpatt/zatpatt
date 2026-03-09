@@ -36,17 +36,89 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { DarkModeContext } from "../context/DarkModeContext.jsx";
+import {
+  fetchNotificationSettingsApi,
+  changeNotificationSettingsApi,
+   reportBugApi,
+} from "../services/settingsApi";
+
+
 export default function SettingsPage() {
   const navigate = useNavigate();
 
   // Toggle states
   const [devices, setDevices] = useState(JSON.parse(localStorage.getItem("loggedDevices")) || []);
   const [darkMode, setDarkMode] = useState(localStorage.getItem("darkMode") === "true" || false);
-  const [notifications, setNotifications] = useState(localStorage.getItem("notifications") === "true");
-  const [orderUpdates, setOrderUpdates] = useState(localStorage.getItem("orderUpdates") === "true");
-  const [rewardAlerts, setRewardAlerts] = useState(localStorage.getItem("rewardAlerts") === "true");
-  const [promoNotifications, setPromoNotifications] = useState(localStorage.getItem("promoNotifications") === "true");
-  const [appUpdates, setAppUpdates] = useState(localStorage.getItem("appUpdates") === "true");
+  // const [notifications, setNotifications] = useState(localStorage.getItem("notifications") === "true");
+  // const [orderUpdates, setOrderUpdates] = useState(localStorage.getItem("orderUpdates") === "true");
+  // const [rewardAlerts, setRewardAlerts] = useState(localStorage.getItem("rewardAlerts") === "true");
+  // const [promoNotifications, setPromoNotifications] = useState(localStorage.getItem("promoNotifications") === "true");
+  // const [appUpdates, setAppUpdates] = useState(localStorage.getItem("appUpdates") === "true");
+
+  const [notifications, setNotifications] = useState(false);
+  const [orderUpdates, setOrderUpdates] = useState(false);
+  const [rewardAlerts, setRewardAlerts] = useState(false);
+  const [promoNotifications, setPromoNotifications] = useState(false);
+  const [appUpdates, setAppUpdates] = useState(false);
+  const [language, setLanguage] = useState(localStorage.getItem("appLanguage") || "en");
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [vibrationEnabled, setVibrationEnabled] = useState(true);
+
+
+ useEffect(() => {
+  const loadSettings = async () => {
+    try {
+      const res = await fetchNotificationSettingsApi();
+
+      if (!res?.status) return;
+
+      const data = res.data;
+
+      setNotifications(data.push_email_sms);
+      setOrderUpdates(data.order_updates);
+      setRewardAlerts(data.rewards_notifications);
+      setPromoNotifications(data.offers_promotions);
+      setAppUpdates(data.app_updates_news);
+      setDarkMode(data.dark_mode);
+      setLanguage(data.language);
+
+      // ✅ NEW
+      setSoundEnabled(data.sound_enabled);
+      setVibrationEnabled(data.vibration_enabled);
+
+    } catch (err) {
+      console.error("Settings fetch error:", err);
+    }
+  };
+
+  loadSettings();
+}, []);
+
+const updateBackendSettings = async (updatedValues) => {
+  try {
+    const payload = {
+      push_email_sms: updatedValues.push_email_sms ?? notifications,
+      order_updates: updatedValues.order_updates ?? orderUpdates,
+      rewards_notifications: updatedValues.rewards_notifications ?? rewardAlerts,
+      offers_promotions: updatedValues.offers_promotions ?? promoNotifications,
+      app_updates_news: updatedValues.app_updates_news ?? appUpdates,
+      dark_mode: updatedValues.dark_mode ?? darkMode,
+      language: updatedValues.language ?? language,
+
+      // ✅ NEW FIELDS
+      sound_enabled: updatedValues.sound_enabled ?? soundEnabled,
+      vibration_enabled: updatedValues.vibration_enabled ?? vibrationEnabled,
+    };
+
+    const res = await changeNotificationSettingsApi(payload);
+
+    if (!res?.status) {
+      console.error("Failed to update settings");
+    }
+  } catch (err) {
+    console.error("Settings update error:", err);
+  }
+};
 
   const [showAppLockPopup, setShowAppLockPopup] = useState(false);
 
@@ -79,39 +151,97 @@ export default function SettingsPage() {
 };
 
   // Add at the top with other useStates
-const [appSoundMode, setAppSoundMode] = useState(
-  localStorage.getItem("appSoundMode") || "sound" // default to 'sound'
-);
+// const [appSoundMode, setAppSoundMode] = useState(
+//   localStorage.getItem("appSoundMode") || "sound" // default to 'sound'
+// );
 
-const handleSoundModeChange = (mode) => {
-  setAppSoundMode(mode);
-  localStorage.setItem("appSoundMode", mode);
+// const handleSoundModeChange = (mode) => {
+//   setAppSoundMode(mode);
+//   localStorage.setItem("appSoundMode", mode);
 
-  // Optional: API call to persist preference
-  updateSetting("appSoundMode", mode);
+//   // Optional: API call to persist preference
+//   updateSetting("appSoundMode", mode);
+// };
+
+
+// CHANGE THIS entire SoundModeSelector:
+const SoundModeSelector = () => {
+  const modes = [
+    { key: "sound", label: "🔊 Sound", desc: "Sound ON" },
+    { key: "vibrate", label: "📳 Vibrate", desc: "Vibrate only" },
+    { key: "silent", label: "🔕 Silent", desc: "No sound or vibration" },
+  ];
+
+  const currentMode = soundEnabled
+    ? "sound"
+    : vibrationEnabled
+    ? "vibrate"
+    : "silent";
+
+  const handleModeChange = (mode) => {
+    const newSound = mode === "sound";
+    const newVibration = mode === "vibrate";
+
+    setSoundEnabled(newSound);
+    setVibrationEnabled(newVibration);
+    updateBackendSettings({
+      sound_enabled: newSound,
+      vibration_enabled: newVibration,
+    });
+
+    // ✅ Test feedback on selection
+    if (mode === "sound") {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 520;
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.4);
+      } catch (e) {
+        console.warn("Audio not supported", e);
+      }
+    }
+
+    if (mode === "vibrate" && navigator.vibrate) {
+      navigator.vibrate([100, 50, 100]);
+    }
+  };
+
+  return (
+    <div className="bg-orange-50 p-4 rounded-xl shadow">
+      <div className="flex items-center gap-2 mb-3">
+        <Volume2 className="text-black w-4 h-4" />
+        <span className="font-semibold">Notification Mode</span>
+      </div>
+
+      <div className="flex gap-2">
+        {modes.map((mode) => (
+          <button
+            key={mode.key}
+            onClick={() => handleModeChange(mode.key)}
+            className={`flex-1 py-2 px-1 rounded-xl text-xs font-semibold border-2 transition ${
+              currentMode === mode.key
+                ? "border-orange-500 bg-orange-500 text-white"
+                : "border-gray-200 bg-white text-gray-600 hover:border-orange-300"
+            }`}
+          >
+            {mode.label}
+          </button>
+        ))}
+      </div>
+
+      <p className="text-xs text-gray-400 mt-2 text-center">
+        Current: {modes.find((m) => m.key === currentMode)?.desc}
+      </p>
+    </div>
+  );
 };
 
-const SoundModeSelector = () => (
-  <div className="bg-orange-50 p-4 rounded-xl shadow flex justify-between items-center">
-    <span className="font-semibold">
-      <Volume2 className="inline mr-1 text-black" /> App Sound / Vibration</span>
-    <div className="flex gap-1">
-      {["sound", "vibration", "silent"].map((mode) => (
-        <button
-          key={mode}
-          onClick={() => handleSoundModeChange(mode)}
-          className={`px-3 py-1 rounded-full font-semibold transition ${
-            appSoundMode === mode
-              ? "bg-orange-500 text-white shadow"
-              : "bg-gray-200 text-gray-700 hover:bg-orange-100"
-          }`}
-        >
-          {mode === "sound" ? "🔊" : mode === "vibration" ? "📳" : "🔕"}
-        </button>
-      ))}
-    </div>
-  </div>
-);
 
   const [showContactPopup, setShowContactPopup] = useState(false);
   const [showSubPopup, setShowSubPopup] = useState(false);
@@ -272,62 +402,72 @@ const logoutDevice = (deviceId) => {
 }, [gender, birthday]);
 
   // New helper function to save toggle changes locally and via API
-const updateSetting = async (key, value) => {
-  // Update localStorage
-  localStorage.setItem(key, value.toString());
+// const updateSetting = async (key, value) => {
+//   // Update localStorage
+//   localStorage.setItem(key, value.toString());
 
-  // Placeholder API call
-  try {
-    // Replace URL with your backend endpoint
-    const response = await fetch("https://your-backend.com/api/updateSettings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // "Authorization": "Bearer YOUR_TOKEN" // if required
-      },
-      body: JSON.stringify({
-        key: key,
-        value: value,
-        userId: localStorage.getItem("userId") || "demoUser"
-      }),
-    });
+//   // Placeholder API call
+//   try {
+//     // Replace URL with your backend endpoint
+//     const response = await fetch("https://your-backend.com/api/updateSettings", {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//         // "Authorization": "Bearer YOUR_TOKEN" // if required
+//       },
+//       body: JSON.stringify({
+//         key: key,
+//         value: value,
+//         userId: localStorage.getItem("userId") || "demoUser"
+//       }),
+//     });
 
-    const data = await response.json();
-    console.log("API response:", data);
-  } catch (err) {
-    console.error("API call failed:", err);
-  }
-};
+//     const data = await response.json();
+//     console.log("API response:", data);
+//   } catch (err) {
+//     console.error("API call failed:", err);
+//   }
+// };
 
 // Updated handleToggle
-const handleToggle = (key, currentValue, setter) => {
-  const newValue = !currentValue;
-  setter(newValue);
+// const handleToggle = (key, currentValue, setter) => {
+//   const newValue = !currentValue;
+//   setter(newValue);
 
-  // Save locally + API
-  updateSetting(key, newValue);
+//   // Save locally + API
+//   updateSetting(key, newValue);
 
-  // Optional frontend debug logs
-  switch (key) {
-    case "notifications":
-      console.log("Push / Email / SMS toggled:", newValue);
-      break;
-    case "orderUpdates":
-      console.log("Order Updates toggled:", newValue);
-      break;
-    case "rewardAlerts":
-      console.log("Rewards Notifications toggled:", newValue);
-      break;
-    case "promoNotifications":
-      console.log("Promotions & Offers toggled:", newValue);
-      break;
-    case "appUpdates":
-      console.log("App Updates / News toggled:", newValue);
-      break;
-    default:
-      break;
+//   // Optional frontend debug logs
+//   switch (key) {
+//     case "notifications":
+//       console.log("Push / Email / SMS toggled:", newValue);
+//       break;
+//     case "orderUpdates":
+//       console.log("Order Updates toggled:", newValue);
+//       break;
+//     case "rewardAlerts":
+//       console.log("Rewards Notifications toggled:", newValue);
+//       break;
+//     case "promoNotifications":
+//       console.log("Promotions & Offers toggled:", newValue);
+//       break;
+//     case "appUpdates":
+//       console.log("App Updates / News toggled:", newValue);
+//       break;
+//     default:
+//       break;
+//   }
+// };
+
+// After the useEffect for passcodeMessage timer
+useEffect(() => {
+  if (darkMode) {
+    document.documentElement.classList.add("dark");
+  } else {
+    document.documentElement.classList.remove("dark");
   }
-};
+}, [darkMode]);
+
 
   const handleLogout = () => {
     localStorage.clear();
@@ -349,19 +489,30 @@ const handleToggle = (key, currentValue, setter) => {
   );
 
   // Modern toggle switch component
-  const ToggleSwitch = ({ label, value, setter }) => (
-    <div className="flex justify-between items-center bg-orange-50 px-4 py-3 rounded-xl shadow">
-      <span>{label}</span>
-      <button
-        onClick={() => handleToggle(label, value, setter)}
-        className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${value ? "bg-orange-500" : "bg-gray-300"}`}
-      >
-        <span
-          className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${value ? "translate-x-6" : "translate-x-0"}`}
-        ></span>
-      </button>
-    </div>
-  );
+ const ToggleSwitch = ({ label, value, setter, settingKey }) => (
+  <div className="flex justify-between items-center bg-orange-50 px-4 py-3 rounded-xl shadow">
+    <span>{label}</span>
+    <button
+      onClick={() => {
+        const newValue = !value;
+        setter(newValue);
+
+        updateBackendSettings({
+          [settingKey]: newValue
+        });
+      }}
+      className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${
+        value ? "bg-orange-500" : "bg-gray-300"
+      }`}
+    >
+      <span
+        className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${
+          value ? "translate-x-6" : "translate-x-0"
+        }`}
+      ></span>
+    </button>
+  </div>
+);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white flex flex-col items-center">
@@ -386,7 +537,7 @@ const handleToggle = (key, currentValue, setter) => {
             <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full text-xs">New</span>
           </div>
           <div className="space-y-3">
-            <AnimatedButton onClick={() => navigate("/profile")}><User className="inline mr-2 text-black" /> Edit Profile</AnimatedButton>
+            {/* <AnimatedButton onClick={() => navigate("/profile")}><User className="inline mr-2 text-black" /> Edit Profile</AnimatedButton> */}
             <AnimatedButton onClick={() => setShowBirthdayPopup(true)}>
   <Calendar className="inline mr-2" /> Birthday {birthday && <span className="text-gray-500 text-sm ml-2">🎉 {birthday}</span>}
 </AnimatedButton>
@@ -419,7 +570,7 @@ const handleToggle = (key, currentValue, setter) => {
           </div>
         </div>
 
-        {/* 3. Security & Privacy */}
+        {/* 3. Security & Privacy
         <div className="bg-white rounded-2xl shadow-lg p-5">
           <div className="flex items-center gap-2 mb-3">
             <Lock className="text-orange-500" />
@@ -461,7 +612,7 @@ const handleToggle = (key, currentValue, setter) => {
     ))}
   </div>
 </div>
-        </div>
+        </div> */}
 
         {/* 4. Payment & Billing */}
         <div className="bg-white rounded-2xl shadow-lg p-5">
@@ -534,27 +685,36 @@ const handleToggle = (key, currentValue, setter) => {
     <ToggleSwitch
       label={<><Bell className="inline mr-2 text-black" /> Push / Email / SMS</>}
       value={notifications}
-      setter={(val) => handleToggle("notifications", notifications, setNotifications)}
+      setter={setNotifications}
+      settingKey="push_email_sms"
     />
+
     <ToggleSwitch
       label={<><Package className="inline mr-2 text-black" /> Order Updates</>}
       value={orderUpdates}
-      setter={(val) => handleToggle("orderUpdates", orderUpdates, setOrderUpdates)}
+      setter={setOrderUpdates}
+      settingKey="order_updates"
     />
+
     <ToggleSwitch
       label={<><Gift className="inline mr-2 text-black" /> Rewards Notifications</>}
       value={rewardAlerts}
-      setter={(val) => handleToggle("rewardAlerts", rewardAlerts, setRewardAlerts)}
+      setter={setRewardAlerts}
+      settingKey="rewards_notifications"
     />
+
     <ToggleSwitch
       label={<><Flame className="inline mr-2 text-black" /> Offers / Promotions</>}
       value={promoNotifications}
-      setter={(val) => handleToggle("promoNotifications", promoNotifications, setPromoNotifications)}
+      setter={setPromoNotifications}
+      settingKey="offers_promotions"
     />
+
     <ToggleSwitch
       label={<><Rss className="inline mr-2 text-black" /> App Updates / News</>}
       value={appUpdates}
-      setter={(val) => handleToggle("appUpdates", appUpdates, setAppUpdates)}
+      setter={setAppUpdates}
+      settingKey="app_updates_news"
     />
   </div>
 </div>
@@ -566,12 +726,19 @@ const handleToggle = (key, currentValue, setter) => {
     <h2 className="text-lg font-semibold">App Preferences</h2>
   </div>
   <div className="space-y-3">
-    <AnimatedButton onClick={() => setShowDarkModePopup(true)}>
-     <Moon className="inline mr-2 text-black-500" /> Dark Mode
-    </AnimatedButton>
+  
+<AnimatedButton onClick={() => setShowDarkModePopup(true)}>
+  <Moon className="inline mr-2 text-black-500" /> Dark Mode
+  {darkMode && <span className="ml-2 text-xs text-orange-500 font-semibold">ON</span>}
+</AnimatedButton>
+
     <AnimatedButton onClick={() => setShowLanguagePopup(true)}>
-   <Globe className="inline mr-2 text-black" /> Language Settings
-    </AnimatedButton>
+  <Globe className="inline mr-2 text-black" /> Language Settings
+  <span className="ml-2 text-xs text-orange-500 font-semibold">
+    {language === "en" ? "🇬🇧 English" : language === "hi" ? "🇮🇳 हिन्दी" : language === "mr" ? "🇮🇳 मराठी" : ""}
+  </span>
+</AnimatedButton>
+
    <div className="space-y-3">
 <SoundModeSelector />
 </div>
@@ -809,37 +976,40 @@ const handleToggle = (key, currentValue, setter) => {
         </button>
 
         <button
-          onClick={async () => {
-            if (!bugTitle.trim() || !bugDescription.trim()) {
-              setBugError("Please fill in both title and description!");
-              return;
-            }
+         onClick={async () => {
+        if (!bugDescription.trim()) {
+          setBugError("Please describe the issue!");
+          return;
+        }
 
-            try {
-              // Replace with your actual backend endpoint
-              const res = await fetch("https://your-backend.com/api/reportBug", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  userId: localStorage.getItem("userId") || "demoUser",
-                  title: bugTitle,
-                  description: bugDescription,
-                  timestamp: new Date().toISOString()
-                }),
-              });
+        try {
+          setBugError(null);
+          setBugSuccess(null);
 
-              if (res.ok) {
-                setBugSuccess("✅ Bug report submitted successfully!");
-                setBugTitle("");
-                setBugDescription("");
-              } else {
-                setBugError("Failed to submit. Try again later.");
-              }
-            } catch (err) {
-              console.error(err);
-              setBugError("Network error. Please try again.");
-            }
-          }}
+          const payload = {
+            report: `${bugTitle ? bugTitle + " - " : ""}${bugDescription}`
+          };
+
+          const res = await reportBugApi(payload);
+
+          if (res?.status) {
+            setBugSuccess("✅ Bug report submitted successfully!");
+            setBugTitle("");
+            setBugDescription("");
+
+            // Auto close after 2 sec
+            setTimeout(() => {
+              setShowBugPopup(false);
+              setBugSuccess(null);
+            }, 2000);
+          } else {
+            setBugError("Failed to submit. Try again.");
+          }
+        } catch (err) {
+          console.error("Bug API error:", err);
+          setBugError("Network error. Please try again.");
+        }
+      }}
           className="w-1/2 py-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 font-semibold"
         >
           Submit
@@ -951,23 +1121,134 @@ const handleToggle = (key, currentValue, setter) => {
     </motion.div>
   </motion.div>
 )}
-{/* Dark Mode Coming Soon Popup */}
+
+{/* Dark Mode Popup */}
+
 {showDarkModePopup && (
-  <ComingSoonPopup
-    title="Dark Mode"
-    icon="🌙"
-    onClose={() => setShowDarkModePopup(false)}
-  />
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+  >
+    <motion.div
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.8, opacity: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-5 text-center"
+    >
+      <h2 className="text-xl font-bold text-orange-500 mb-2">🌙 Dark Mode</h2>
+      <p className="text-sm text-gray-500 mb-4">
+        Toggle dark mode for the app
+      </p>
+
+      <div className="flex justify-between items-center bg-orange-50 px-4 py-3 rounded-xl shadow mb-4">
+        <span className="font-semibold">
+          {darkMode ? "🌙 Dark Mode ON" : "☀️ Light Mode ON"}
+        </span>
+        <button
+          onClick={() => {
+            const newValue = !darkMode;
+            setDarkMode(newValue);
+            localStorage.setItem("darkMode", newValue.toString());
+            updateBackendSettings({ dark_mode: newValue });
+
+            // Apply to document
+            if (newValue) {
+              document.documentElement.classList.add("dark");
+            } else {
+              document.documentElement.classList.remove("dark");
+            }
+          }}
+          className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${
+            darkMode ? "bg-orange-500" : "bg-gray-300"
+          }`}
+        >
+          <span
+            className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${
+              darkMode ? "translate-x-6" : "translate-x-0"
+            }`}
+          />
+        </button>
+      </div>
+
+      <motion.button
+        whileTap={{ scale: 0.95 }}
+        onClick={() => setShowDarkModePopup(false)}
+        className="w-full py-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 font-semibold"
+      >
+        Done
+      </motion.button>
+    </motion.div>
+  </motion.div>
 )}
 
-{/* Language Settings Coming Soon Popup */}
+{/* Language Settings Popup */}
+
 {showLanguagePopup && (
-  <ComingSoonPopup
-    title="Language Settings"
-    icon="🌐"
-    onClose={() => setShowLanguagePopup(false)}
-  />
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+  >
+    <motion.div
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.8, opacity: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-5"
+    >
+      <h2 className="text-xl font-bold text-orange-500 text-center mb-2">
+        🌐 Language Settings
+      </h2>
+      <p className="text-sm text-gray-500 text-center mb-4">
+        Select your preferred language
+      </p>
+
+      <div className="space-y-3">
+        {[
+          { code: "en", label: "🇬🇧 English", sublabel: "English" },
+          // { code: "hi", label: "🇮🇳 हिन्दी", sublabel: "Hindi" },
+          // { code: "mr", label: "🇮🇳 मराठी", sublabel: "Marathi" },
+        ].map((lang) => (
+          <button
+            key={lang.code}
+            onClick={() => {
+              setLanguage(lang.code);
+              localStorage.setItem("appLanguage", lang.code);
+              updateBackendSettings({ language: lang.code });
+            }}
+            className={`w-full flex justify-between items-center px-4 py-3 rounded-xl border-2 transition font-semibold ${
+              language === lang.code
+                ? "border-orange-500 bg-orange-50 text-orange-600"
+                : "border-gray-200 bg-white text-gray-700 hover:bg-orange-50 hover:border-orange-300"
+            }`}
+          >
+            <span>{lang.label}</span>
+            {language === lang.code && (
+              <span className="text-orange-500 text-lg">✓</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      <p className="text-xs text-gray-400 text-center mt-4">
+        More languages coming soon 🌍
+      </p>
+
+      <motion.button
+        whileTap={{ scale: 0.95 }}
+        onClick={() => setShowLanguagePopup(false)}
+        className="mt-4 w-full py-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 font-semibold"
+      >
+        Done
+      </motion.button>
+    </motion.div>
+  </motion.div>
 )}
+
   </div>
   );
 }

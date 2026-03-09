@@ -91,14 +91,24 @@ export default function OtpPage() {
     }
 
     // ✅ STORE JWT + USER
+    const accessToken = data.access || data.accessToken || data.token;
+    const refreshToken = data.refresh || data.refreshToken || "";
+
+    if (!accessToken) {
+      alert("Login succeeded but token was missing in response.");
+      return;
+    }
+
     saveAuthData({
-      access: data.access,
-      refresh: data.refresh,
-      user: data.user,
+      access: accessToken,
+      refresh: refreshToken,
+      user: data.user || null,
     });
 
     // ✅ REDIRECT
-    navigate("/home");
+    
+// TO THIS:
+navigate("/home", { replace: true }); // ✅ prevents back-button returning to OTP
   } catch (err) {
     console.error(err);
     alert("Server error. Please try again.");
@@ -123,11 +133,12 @@ export default function OtpPage() {
   // check if all 6 digits entered
   const isOtpComplete = otp.every((digit) => digit !== "");
 
-  useEffect(() => {
+  
+useEffect(() => {
   if (!location.state?.mobile) {
     navigate("/");
   }
-}, []);
+}, [location.state, navigate]); // ✅ correct deps
 
 
   return (

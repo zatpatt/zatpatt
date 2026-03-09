@@ -1,9 +1,32 @@
 // src/pages/SpinandWinPage.jsx
+
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Confetti from "react-confetti";
+import { fetchRewardsApi } from "../services/rewardsApi";
+import { spinWheelApi, spinStatusApi } from "../services/rewardsApi";
+
+
+/**
+ * Spin & Win — Backend Controlled Version
+ *
+ * - Rewards loaded from /rewards/
+ * - Spin status loaded from /spin-status/
+ * - Spin executed via /spin/
+ * - Backend controls:
+ *    - spins_left
+ *    - free spin timing
+ *    - reward result
+ *    - total points
+ *
+ * Frontend only handles:
+ *    - Animation
+ *    - Display
+ *    - UI state
+ */
+
 
 /**
  * Spin & Win — Option B (Claim free spin via modal; do NOT auto-spin)
@@ -26,33 +49,35 @@ import Confetti from "react-confetti";
 
 const LS = {
   points: "SpinAndWin_totalPoints",
-  spins: "SpinAndWin_spinsLeft",
-  lastFree: "SpinAndWin_lastFreeClaim",
   userSpent: "SpinAndWin_userSpent",
   spentMarked: "SpinAndWin_spentForSpinsMarked",
 };
 
-const HOUR24 = 24 * 60 * 60 * 1000;
+// const HOUR24 = 24 * 60 * 60 * 1000;
 
 export default function SpinandWinPage() {
   const navigate = useNavigate();
 
   // segments with labels, points (0 for extra spin), and color
-  const segments = [
-    { id: "p5", label: "+5 Points", points: 5, color: "#F97316" },
-    { id: "p10", label: "+10 Points", points: 10, color: "#FFF7EB" },
-    { id: "p15", label: "+15 Points", points: 15, color: "#FB923C" },
-    { id: "p20", label: "+20 Points", points: 20, color: "#FFF7EB" },
-    { id: "p25", label: "+25 Points", points: 25, color: "#F97316" },
-    { id: "p50", label: "+50 Points", points: 50, color: "#FFF7EB" },
-    { id: "p75", label: "+75 Points", points: 75, color: "#FB923C" },
-    { id: "extra", label: "+1 Extra Spin", points: 0, color: "#FFF7EB" },
-  ];
+  // const segments = [
+  //   { id: "p5", label: "+5 Points", points: 5, color: "#F97316" },
+  //   { id: "p10", label: "+10 Points", points: 10, color: "#FFF7EB" },
+  //   { id: "p15", label: "+15 Points", points: 15, color: "#FB923C" },
+  //   { id: "p20", label: "+20 Points", points: 20, color: "#FFF7EB" },
+  //   { id: "p25", label: "+25 Points", points: 25, color: "#F97316" },
+  //   { id: "p50", label: "+50 Points", points: 50, color: "#FFF7EB" },
+  //   { id: "p75", label: "+75 Points", points: 75, color: "#FB923C" },
+  //   { id: "extra", label: "+1 Extra Spin", points: 0, color: "#FFF7EB" },
+  // ];
 
-  // Weights => higher weight = more likely
-  // Map indices to segments array order
-  // Make small numbers higher for common rewards
-  const weights = [18, 18, 18, 18, 9, 7, 3, 2]; // sums to 93 for variety
+  // // Weights => higher weight = more likely
+  // // Map indices to segments array order
+  // // Make small numbers higher for common rewards
+  // const weights = [18, 18, 18, 18, 9, 7, 3, 2]; // sums to 93 for variety
+
+  const [segments, setSegments] = useState([]);
+  // const [weights, setWeights] = useState([]);
+  const [loadingWheel, setLoadingWheel] = useState(true);
 
   // state
   const [totalPoints, setTotalPoints] = useState(() =>
@@ -60,12 +85,17 @@ export default function SpinandWinPage() {
   );
   const [displayPoints, setDisplayPoints] = useState(totalPoints);
 
-  const [spinsLeft, setSpinsLeft] = useState(() =>
-    parseInt(localStorage.getItem(LS.spins) || "0", 10)
-  );
-  const [lastFreeClaim, setLastFreeClaim] = useState(() =>
-    parseInt(localStorage.getItem(LS.lastFree) || "0", 10)
-  );
+  // const [spinsLeft, setSpinsLeft] = useState(() =>
+  //   parseInt(localStorage.getItem(LS.spins) || "0", 10)
+  // );
+  // const [lastFreeClaim, setLastFreeClaim] = useState(() =>
+  //   parseInt(localStorage.getItem(LS.lastFree) || "0", 10)
+  // );
+
+  const [spinsLeft, setSpinsLeft] = useState(0);
+  const [canSpin, setCanSpin] = useState(false);
+  const [nextFreeSpinAt, setNextFreeSpinAt] = useState(null);
+  const [nextFreeAvailable, setNextFreeAvailable] = useState(false);
 
   const [userSpent, setUserSpent] = useState(() =>
     parseInt(localStorage.getItem(LS.userSpent) || "0", 10)
@@ -83,6 +113,70 @@ export default function SpinandWinPage() {
   const winSound = useRef(null);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
 
+  useEffect(() => {
+  const loadWheelRewards = async () => {
+    try {
+      setLoadingWheel(true);
+      const res = await fetchRewardsApi();
+
+      if (!res?.status) return;
+
+      // Convert backend rewards → wheel format
+      const mapped = res.rewards.map((r, index) => ({
+        id: r.id,
+        label: r.name,
+        points: r.points,
+        extra_spin: r.extra_spin,
+        color: index % 2 === 0 ? "#F97316" : "#FFF7EB",
+      }));
+
+      setSegments(mapped);
+
+      // Dynamic weights logic
+      // const dynamicWeights = mapped.map((r) => {
+      //   if (r.extra_spin) return 2;
+      //   if (r.points >= 75) return 3;
+      //   if (r.points >= 50) return 6;
+      //   if (r.points >= 25) return 10;
+      //   return 18;
+      // });
+
+      // setWeights(dynamicWeights);
+
+    } catch (err) {
+      console.error("Wheel load error", err);
+    } finally {
+      setLoadingWheel(false);
+    }
+  };
+
+  loadWheelRewards();
+}, []);
+
+
+useEffect(() => {
+  const loadSpinStatus = async () => {
+    try {
+      const res = await spinStatusApi();
+
+      if (!res?.status) return;
+
+      setSpinsLeft(res.spins_left);
+      setCanSpin(res.can_spin);
+      setNextFreeSpinAt(res.next_free_spin_at);
+      setNextFreeAvailable(res.next_free_spin_available);
+      setTotalPoints(res.total_points);
+      setDisplayPoints(res.total_points);
+
+    } catch (err) {
+      console.error("Spin status error", err);
+    }
+  };
+
+  loadSpinStatus();
+}, []);
+
+
   // update window size for confetti
   useEffect(() => {
     const onResize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
@@ -93,45 +187,45 @@ export default function SpinandWinPage() {
 
   // persist key changes
   useEffect(() => localStorage.setItem(LS.points, String(totalPoints)), [totalPoints]);
-  useEffect(() => localStorage.setItem(LS.spins, String(spinsLeft)), [spinsLeft]);
-  useEffect(() => localStorage.setItem(LS.lastFree, String(lastFreeClaim)), [lastFreeClaim]);
+  // useEffect(() => localStorage.setItem(LS.spins, String(spinsLeft)), [spinsLeft]);
+  // useEffect(() => localStorage.setItem(LS.lastFree, String(lastFreeClaim)), [lastFreeClaim]);
   useEffect(() => localStorage.setItem(LS.userSpent, String(userSpent)), [userSpent]);
   useEffect(() => localStorage.setItem(LS.spentMarked, String(spentMarked)), [spentMarked]);
 
   // when component mounts, award spins from userSpent if new thresholds crossed
-  useEffect(() => {
-    // calculate how many new extra spins should be awarded based on userSpent vs spentMarked
-    const alreadyAwardedUnits = Math.floor(spentMarked / 500);
-    const currentUnits = Math.floor(userSpent / 500);
-    const newUnits = Math.max(0, currentUnits - alreadyAwardedUnits);
-    if (newUnits > 0) {
-      const newSpins = spinsLeft + newUnits;
-      setSpinsLeft(newSpins);
-      // mark those rupees as accounted for
-      const newMarked = spentMarked + newUnits * 500;
-      setSpentMarked(newMarked);
-      // show a toast/modal informing the user (non-blocking)
-      setShowModal({
-        type: "info",
-        title: "Extra Spin(s) Earned",
-        body: `You've earned ${newUnits} extra spin(s) for spending ₹${newUnits * 500}. Go spin!`,
-        confirmText: "OK",
-        onConfirm: () => setShowModal(null),
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // run once on mount
+  // useEffect(() => {
+  //   // calculate how many new extra spins should be awarded based on userSpent vs spentMarked
+  //   const alreadyAwardedUnits = Math.floor(spentMarked / 500);
+  //   const currentUnits = Math.floor(userSpent / 500);
+  //   const newUnits = Math.max(0, currentUnits - alreadyAwardedUnits);
+  //   if (newUnits > 0) {
+  //     const newSpins = spinsLeft + newUnits;
+  //     setSpinsLeft(newSpins);
+  //     // mark those rupees as accounted for
+  //     const newMarked = spentMarked + newUnits * 500;
+  //     setSpentMarked(newMarked);
+  //     // show a toast/modal informing the user (non-blocking)
+  //     setShowModal({
+  //       type: "info",
+  //       title: "Extra Spin(s) Earned",
+  //       body: `You've earned ${newUnits} extra spin(s) for spending ₹${newUnits * 500}. Go spin!`,
+  //       confirmText: "OK",
+  //       onConfirm: () => setShowModal(null),
+  //     });
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, []); // run once on mount
 
   // helper: weighted random index
-  const weightedIndex = (weightsArr) => {
-    const total = weightsArr.reduce((a, b) => a + b, 0);
-    let r = Math.random() * total;
-    for (let i = 0; i < weightsArr.length; i++) {
-      if (r < weightsArr[i]) return i;
-      r -= weightsArr[i];
-    }
-    return weightsArr.length - 1;
-  };
+  // const weightedIndex = (weightsArr) => {
+  //   const total = weightsArr.reduce((a, b) => a + b, 0);
+  //   let r = Math.random() * total;
+  //   for (let i = 0; i < weightsArr.length; i++) {
+  //     if (r < weightsArr[i]) return i;
+  //     r -= weightsArr[i];
+  //   }
+  //   return weightsArr.length - 1;
+  // };
 
   // animate points from -> to
   const animatePoints = (from, to) => {
@@ -150,175 +244,215 @@ export default function SpinandWinPage() {
   };
 
   // Claim free spin modal (Option B). Called when user clicks "Use Now".
-  const claimFreeSpin = () => {
-    // add 1 spin but do NOT auto-spin (Option B)
-    const newSpins = spinsLeft + 1;
-    setSpinsLeft(newSpins);
-    const now = Date.now();
-    setLastFreeClaim(now);
-    // persist done by effect
+  // const claimFreeSpin = () => {
+  //   // add 1 spin but do NOT auto-spin (Option B)
+  //   const newSpins = spinsLeft + 1;
+  //   setSpinsLeft(newSpins);
+  //   const now = Date.now();
+  //   setLastFreeClaim(now);
+  //   // persist done by effect
+  //   setShowModal({
+  //     type: "info",
+  //     title: "Free spin added",
+  //     body: "A free spin was added to your account. Tap Spin to use it.",
+  //     confirmText: "OK",
+  //     onConfirm: () => setShowModal(null),
+  //   });
+  // };
+
+  // check eligibility for free spin (returns boolean)
+  // const freeSpinEligible = () => {
+  //   if (!lastFreeClaim) return true; // never claimed -> eligible
+  //   return Date.now() - lastFreeClaim >= HOUR24;
+  // };
+
+  // When the user clicks main Spin button
+  // const onSpinClick = () => {
+  //   // if currently spinning: ignore
+  //   if (spinning) return;
+
+  //   // If have spins, start spin
+  //   startSpin();
+
+  //   // no spins left: check free eligibility
+  //   if (freeSpinEligible()) {
+  //     // show Claim Free Spin modal (Option B: add spin but do not auto spin)
+  //     setShowModal({
+  //       type: "confirmFree",
+  //       title: "Free Spin Available",
+  //       body: "You have 1 free spin available. Claim it now? (You will need to tap Spin again to use it.)",
+  //       confirmText: "Use Now",
+  //       cancelText: "Cancel",
+  //       onConfirm: () => {
+  //         claimFreeSpin();
+  //       },
+  //       onCancel: () => setShowModal(null),
+  //     });
+  //     return;
+  //   }
+
+  //   // otherwise show a gentle info modal suggesting how to earn spins
+  //   setShowModal({
+  //     type: "info",
+  //     title: "No Spins Available",
+  //     body:
+  //       "No spins left. Earn spins by:\n• Hitting the +1 Extra Spin segment on the wheel\n• Earning 1 extra spin for every ₹500 you spend",
+  //     confirmText: "Got it",
+  //     onConfirm: () => setShowModal(null),
+  //   });
+  // };
+
+  const onSpinClick = () => {
+  if (spinning || loadingWheel) return;
+
+  if (!canSpin) {
     setShowModal({
       type: "info",
-      title: "Free spin added",
-      body: "A free spin was added to your account. Tap Spin to use it.",
+      title: "Cannot Spin",
+      body: nextFreeAvailable
+        ? "Your free spin is available."
+        : "No spins available right now.",
       confirmText: "OK",
       onConfirm: () => setShowModal(null),
     });
-  };
+    return;
+  }
 
-  // check eligibility for free spin (returns boolean)
-  const freeSpinEligible = () => {
-    if (!lastFreeClaim) return true; // never claimed -> eligible
-    return Date.now() - lastFreeClaim >= HOUR24;
-  };
-
-  // When the user clicks main Spin button
-  const onSpinClick = () => {
-    // if currently spinning: ignore
-    if (spinning) return;
-
-    // If have spins, start spin
-    if (spinsLeft > 0) {
-      startSpin();
-      return;
-    }
-
-    // no spins left: check free eligibility
-    if (freeSpinEligible()) {
-      // show Claim Free Spin modal (Option B: add spin but do not auto spin)
-      setShowModal({
-        type: "confirmFree",
-        title: "Free Spin Available",
-        body: "You have 1 free spin available. Claim it now? (You will need to tap Spin again to use it.)",
-        confirmText: "Use Now",
-        cancelText: "Cancel",
-        onConfirm: () => {
-          claimFreeSpin();
-        },
-        onCancel: () => setShowModal(null),
-      });
-      return;
-    }
-
-    // otherwise show a gentle info modal suggesting how to earn spins
-    setShowModal({
-      type: "info",
-      title: "No Spins Available",
-      body:
-        "No spins left. Earn spins by:\n• Hitting the +1 Extra Spin segment on the wheel\n• Earning 1 extra spin for every ₹500 you spend",
-      confirmText: "Got it",
-      onConfirm: () => setShowModal(null),
-    });
-  };
+  startSpin();
+};
 
   // actual spin procedure
-  const startSpin = () => {
-    if (spinning) return;
-    if (spinsLeft <= 0) {
-      // should be prevented earlier
-      return;
-    }
+  const startSpin = async () => {
+  if (spinning || loadingWheel) return;
 
+  try {
     setSpinning(true);
-    spinSound.current?.play?.();
 
-    // choose prize via weights
-    const prizeIndex = weightedIndex(weights);
-    const segmentAngle = 360 / segments.length;
-    // calculate rotation so the wheel slows down to that prize
-    const randomOffset = Math.random() * (segmentAngle * 0.5) - (segmentAngle * 0.25);
-    const stopAngle = prizeIndex * segmentAngle + segmentAngle / 2 + randomOffset;
-    // multiple rotations + computed stop
-    const fullRotations = 360 * 8;
-    const totalRotation = fullRotations - stopAngle;
-    setRotation((r) => r + totalRotation);
+    // 🔥 Call backend spin API
+    const res = await spinWheelApi();
 
-    // deduct one spin now
-    setSpinsLeft((s) => {
-      const newVal = Math.max(0, s - 1);
-      // persisted by useEffect
-      return newVal;
-    });
-
-    // on spin end (after animation duration)
-    setTimeout(() => {
-      const seg = segments[prizeIndex];
-
-      // If extra spin segment
-      if (seg.id === "extra") {
-        // award one extra spin
-        setSpinsLeft((s) => {
-          const newVal = s + 1; // was already decremented, so effectively net 0 or +1 depending
-          localStorage.setItem(LS.spins, String(newVal));
-          return newVal;
-        });
-
-        // Show modal/toast for extra spin (no points)
-        setRewardText("+1 Extra Spin");
-        setShowConfetti(true);
-        winSound.current?.play?.();
-        animatePoints(displayPoints, displayPoints); // no point change
-        setTimeout(() => setShowConfetti(false), 3000);
-      } else {
-        // regular points awarded
-        const won = seg.points || 0;
-        const newTotal = totalPoints + won;
-        setTotalPoints(newTotal);
-        localStorage.setItem(LS.points, String(newTotal));
-        setRewardText(seg.label);
-        setShowConfetti(true);
-        winSound.current?.play?.();
-        animatePoints(displayPoints, newTotal);
-        setTimeout(() => setShowConfetti(false), 3500);
-      }
-
-      // minor UI finish
-      setSpinning(false);
-
-      // Show a modal summarizing the win (no alert)
-      setShowModal({
-        type: "result",
-        title: "You won!",
-        body: seg.id === "extra" ? "You got +1 extra spin. Try again!" : `You won ${seg.label}!`,
-        confirmText: "Nice",
-        onConfirm: () => setShowModal(null),
-      });
-    }, 4400); // match animation (approx)
-  };
-
-  // small utility to format next free spin countdown (if lastFreeClaim exists)
-  const remainingForNextFree = () => {
-    if (!lastFreeClaim) return "00:00:00";
-    const diff = HOUR24 - (Date.now() - lastFreeClaim);
-    if (diff <= 0) return "00:00:00";
-    const hrs = Math.floor(diff / (1000 * 60 * 60));
-    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const secs = Math.floor((diff % (1000 * 60)) / 1000);
-    return `${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  };
-
-  // small "simulate spend" helper for demo/testing (you can remove in prod)
-  const addSpendForDemo = (amt) => {
-    const newSpent = userSpent + amt;
-    setUserSpent(newSpent);
-    // check awarding extra spins for new threshold
-    const alreadyUnits = Math.floor(spentMarked / 500);
-    const newUnits = Math.floor(newSpent / 500) - alreadyUnits;
-    if (newUnits > 0) {
-      const newSpins = spinsLeft + newUnits;
-      setSpinsLeft(newSpins);
-      setSpentMarked(spentMarked + newUnits * 500);
+    if (!res?.status) {
       setShowModal({
         type: "info",
-        title: "Extra Spin(s) Earned",
-        body: `You've earned ${newUnits} extra spin(s) for spending ₹${newUnits * 500}.`,
+        title: "Spin Failed",
+        body: "Unable to spin right now.",
         confirmText: "OK",
         onConfirm: () => setShowModal(null),
       });
+      setSpinning(false);
+      return;
     }
-  };
+
+    const backendReward = res.reward;
+
+    // 🔥 Find matching segment index
+    const prizeIndex = segments.findIndex(
+      (s) => s.id === backendReward.id
+    );
+
+    if (prizeIndex === -1) {
+      console.error("Reward not found in wheel segments");
+      setSpinning(false);
+      return;
+    }
+
+    const segmentAngle = 360 / segments.length;
+    const randomOffset =
+      Math.random() * (segmentAngle * 0.5) - segmentAngle * 0.25;
+
+    const stopAngle =
+      360 - (prizeIndex * segmentAngle + segmentAngle / 2) +
+      randomOffset;
+
+    const fullRotations = 360 * 8;
+    const totalRotation = fullRotations + stopAngle;
+
+    setRotation((r) => r + totalRotation);
+
+    // 🔥 Update values from backend
+    setSpinsLeft(res.spins_left);
+    setTotalPoints(res.total_points);
+    setDisplayPoints(res.total_points);
+    setCanSpin(res.spins_left > 0 || res.next_free_spin_available);
+    setNextFreeSpinAt(res.next_free_spin_at);
+    setNextFreeAvailable(res.next_free_spin_available);
+
+
+    // 🔥 Handle next free spin
+    // if (res.next_free_spin_at) {
+    //   setLastFreeClaim(new Date(res.next_free_spin_at).getTime());
+    // }
+
+    // 🎉 After animation ends
+    setTimeout(() => {
+      setRewardText(backendReward.name);
+      setShowConfetti(true);
+
+      setTimeout(() => setShowConfetti(false), 3500);
+
+      setShowModal({
+        type: "result",
+        title: "You won!",
+        body: `You won ${backendReward.name}!`,
+        confirmText: "Nice",
+        onConfirm: () => setShowModal(null),
+      });
+
+      setSpinning(false);
+    }, 4000);
+  } catch (error) {
+    console.error("Spin API error:", error);
+    setSpinning(false);
+  }
+};
+
+  // small utility to format next free spin countdown (if lastFreeClaim exists)
+  // const remainingForNextFree = () => {
+  //   if (!lastFreeClaim) return "00:00:00";
+  //   const diff = HOUR24 - (Date.now() - lastFreeClaim);
+  //   if (diff <= 0) return "00:00:00";
+  //   const hrs = Math.floor(diff / (1000 * 60 * 60));
+  //   const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  //   const secs = Math.floor((diff % (1000 * 60)) / 1000);
+  //   return `${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  // };
+
+  // small "simulate spend" helper for demo/testing (you can remove in prod)
+  // const addSpendForDemo = (amt) => {
+  //   const newSpent = userSpent + amt;
+  //   setUserSpent(newSpent);
+  //   // check awarding extra spins for new threshold
+  //   const alreadyUnits = Math.floor(spentMarked / 500);
+  //   const newUnits = Math.floor(newSpent / 500) - alreadyUnits;
+  //   if (newUnits > 0) {
+  //     const newSpins = spinsLeft + newUnits;
+  //     setSpinsLeft(newSpins);
+  //     setSpentMarked(spentMarked + newUnits * 500);
+  //     setShowModal({
+  //       type: "info",
+  //       title: "Extra Spin(s) Earned",
+  //       body: `You've earned ${newUnits} extra spin(s) for spending ₹${newUnits * 500}.`,
+  //       confirmText: "OK",
+  //       onConfirm: () => setShowModal(null),
+  //     });
+  //   }
+  // };
 
   const radius = windowSize.width > 640 ? 150 : 120;
+
+  const formatCountdown = () => {
+  if (!nextFreeSpinAt) return "--:--:--";
+
+  const diff = new Date(nextFreeSpinAt).getTime() - Date.now();
+  if (diff <= 0) return "Available";
+
+  const hrs = Math.floor(diff / (1000 * 60 * 60));
+  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+  return `${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+};
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white flex flex-col items-center relative">
@@ -411,9 +545,9 @@ export default function SpinandWinPage() {
 
       {/* Controls */}
       <div className="flex flex-col justify-center items-center mt-6 w-[90%] sm:w-[60%]">
-        <button
+       <button
           onClick={onSpinClick}
-          disabled={spinning}
+          disabled={spinning || loadingWheel || segments.length === 0}
           className={`px-9 py-3 rounded-full font-semibold text-white shadow-md text-sm transition ${
             spinning ? "bg-gray-400 cursor-not-allowed" : "bg-orange-500 hover:bg-orange-600"
           }`}
@@ -422,10 +556,10 @@ export default function SpinandWinPage() {
         </button>
 
         <p className="text-sm text-gray-600 mt-3">🎯 Spins Left: <strong>{spinsLeft}</strong></p>
-        <p className="text-sm text-gray-600 mt-1">⏳ Next Free Spin: {freeSpinEligible() ? "Available" : remainingForNextFree()}</p>
+        <p className="text-sm text-gray-600 mt-1">⏳ Next Free Spin: {nextFreeAvailable ? "Available" : formatCountdown()}</p>
 
         {/* Progress bar for ₹500 spent */}
-        <div className="w-full mt-4">
+        {/* <div className="w-full mt-4">
           <p className="text-sm text-gray-600 mb-1">💰 Spent: ₹{userSpent} (every ₹500 = 1 spin)</p>
           <div className="w-full bg-gray-300 h-2 rounded-full">
             <div
@@ -433,10 +567,10 @@ export default function SpinandWinPage() {
               style={{ width: `${((userSpent % 500) / 500) * 100}%` }}
             />
           </div>
-        </div>
+        </div> */}
 
         {/* small demo buttons (optional) */}
-        <div className="mt-4 flex gap-2">
+        {/* <div className="mt-4 flex gap-2">
           <button
             onClick={() => addSpendForDemo(120)}
             className="px-3 py-1 rounded-xl bg-white border"
@@ -449,7 +583,7 @@ export default function SpinandWinPage() {
           >
             +₹400 (demo)
           </button>
-        </div>
+        </div> */}
       </div>
 
       {/* Reward text */}
@@ -515,7 +649,7 @@ export default function SpinandWinPage() {
       <div className="mt-8 mb-10 text-center bg-orange-100 border border-orange-300 rounded-xl p-4 w-[85%] sm:w-[60%] shadow-md">
         <h3 className="text-orange-600 font-bold mb-2 text-lg">📝 Spin Rules</h3>
         <ul className="text-gray-700 text-sm leading-relaxed">
-          <li>🎯 1 Free Spin every 24 hours</li>
+          <li>🎯 1 Free Spin every week</li>
           <li>💰 1 Extra Spin for every ₹500 spent</li>
         </ul>
       </div>

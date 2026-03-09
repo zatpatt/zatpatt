@@ -1,4 +1,5 @@
 // src/pages/ProfilePage.jsx
+
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,7 +16,9 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useFavorites } from "../context/FavoritesContext";
 import { MapPin } from "lucide-react";
-import { fetchMyProfile, uploadProfilePhoto } from "../services/profileApi";
+import { fetchMyProfile, uploadProfilePhoto, editProfileApi } from "../services/profileApi";
+import { deleteAccountApi } from "../services/settingsApi";
+import { logout } from "../utils/auth"; // add this import at top
 
 
 /**
@@ -118,20 +121,33 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
-  
-  
+ 
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+
   // basic profile state (kept from your earlier code)
   const [email, setEmail] = useState(localStorage.getItem("userEmail") || "");
   const [phone] = useState(localStorage.getItem("userPhone") || "");
-  const [userName, setUserName] = useState(localStorage.getItem("userName") || "");
-  const [tempName, setTempName] = useState(userName);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [tempFirstName, setTempFirstName] = useState("");
+  const [tempLastName, setTempLastName] = useState("");
   const [tempEmail, setTempEmail] = useState(email);
+
+  const [gender, setGender] = useState("");
+  const [dob, setDob] = useState("");
+
+  const [tempGender, setTempGender] = useState("");
+  const [tempDob, setTempDob] = useState("");
+
   const [profileImage, setProfileImage] = useState(localStorage.getItem("profileImage") || null);
   const [editing, setEditing] = useState(false);
   const [totalPoints, setTotalPoints] = useState(
-    parseInt(localStorage.getItem("SpinAndWin_totalPoints") || "120", 10)
+  parseInt(localStorage.getItem("SpinAndWin_totalPoints") || "120", 10)
   );
-
+const [imageVersion, setImageVersion] = useState(0);
   // Favorites + savedLater (kept)
   const { favorites, removeFavorite } = useFavorites();
   const [savedLater, setSavedLater] = useState(JSON.parse(localStorage.getItem("savedForLater") || "[]"));
@@ -157,6 +173,17 @@ export default function ProfilePage() {
   //   }
   // });
 
+  const getFullImageUrl = (url) => {
+  if (!url) return null;
+
+  if (url.startsWith("http")) return url;
+
+  const baseURL =
+    import.meta.env.VITE_API_URL || "http://localhost:8002";
+
+  return `${baseURL}${url}`;
+};
+
   // persist orders
   useEffect(() => {
   const loadProfile = async () => {
@@ -174,8 +201,20 @@ export default function ProfilePage() {
       setProfile(data);
       setOrders(data.orders || []);
 
-      setUserName(data.full_name || "");
+      setFirstName(data.first_name || "");
+      setLastName(data.last_name || "");
       setEmail(data.email || "");
+
+      setGender(data.gender || "");
+      setDob(data.dob || "");
+
+      
+      setTempFirstName(data.first_name || "");
+      setTempLastName(data.last_name || "");
+
+      setTempGender(data.gender || "");
+      setTempDob(data.dob || "");
+      
     } catch (err) {
       console.error("Profile error", err);
     } finally {
@@ -186,6 +225,26 @@ export default function ProfilePage() {
   loadProfile();
 }, []);
 
+
+const handleDeleteAccount = async () => {
+  try {
+    setDeleteLoading(true);
+    setDeleteError(null);
+
+    const res = await deleteAccountApi();
+
+    if (res?.status) {
+      logout(); // ✅ clears all auth data and redirects to "/"
+    } else {
+      setDeleteError("Failed to delete account."); // ✅ now inside try block
+    }
+  } catch (err) {
+    console.error("Delete account error:", err);
+    setDeleteError("Network error. Please try again.");
+  } finally {
+    setDeleteLoading(false);
+  }
+};
 
   // show either 3 recent or all in modal
   const [showAllOrdersModal, setShowAllOrdersModal] = useState(false);
@@ -203,12 +262,14 @@ export default function ProfilePage() {
   const [sortKey, setSortKey] = useState("date_desc"); // date_desc, date_asc, amount_desc, amount_asc
 
   // keep profile persistence (small)
-  useEffect(() => {
-    localStorage.setItem("userName", userName);
-  }, [userName]);
-  useEffect(() => {
-    localStorage.setItem("userEmail", email);
-  }, [email]);
+  // useEffect(() => {
+  //   localStorage.setItem("userName", userName);
+  // }, [userName]);
+
+  // useEffect(() => {
+  //   localStorage.setItem("userEmail", email);
+  // }, [email]);
+
   useEffect(() => {
     if (profileImage) localStorage.setItem("profileImage", profileImage);
   }, [profileImage]);
@@ -342,31 +403,34 @@ export default function ProfilePage() {
   };
 
   // profile image upload
-  const handleFileChange = async (e) => {
+ const handleFileChange = async (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
 
   try {
-    // show preview immediately
+    // ✅ 1. Show preview immediately
     const preview = URL.createObjectURL(file);
     setProfileImage(preview);
 
+    // ✅ 2. Upload image
     const res = await uploadProfilePhoto(file);
 
     if (!res?.status) {
-      throw new Error("Profile upload failed");
+      throw new Error("Upload failed");
     }
 
-    // backend may return updated photo URL
-    if (res.data?.profile_photo) {
-      setProfile((prev) => ({
-        ...prev,
-        profile_photo: res.data.profile_photo,
-      }));
+    // ✅ 3. Fetch updated profile from backend
+    const updatedProfile = await fetchMyProfile();
+
+    if (updatedProfile?.status) {
+      setProfile(updatedProfile.data);
     }
+
+    // ✅ 4. Remove preview (now real image will show)
+    setProfileImage(null);
 
   } catch (err) {
-    console.error("Profile upload error", err);
+    console.error("Upload error", err);
     alert("Failed to upload profile photo");
   }
 };
@@ -374,31 +438,73 @@ export default function ProfilePage() {
 
   // edit profile
   const handleEditClick = () => {
-    setTempName(userName);
-    setTempEmail(email);
-    setEditing(true);
-  };
-  const handleCancel = () => {
-    setEditing(false);
-    setTempName(userName);
-    setTempEmail(email);
-  };
-  const handleSave = () => {
-    setUserName(tempName);
+  setTempFirstName(firstName);
+  setTempLastName(lastName);
+  setTempEmail(email);
+  setEditing(true);
+};
+
+ const handleCancel = () => {
+  setEditing(false);
+
+  setTempFirstName(firstName);
+  setTempLastName(lastName);
+  setTempEmail(email);
+  setTempGender(gender);
+  setTempDob(dob);
+};
+
+
+  const handleSave = async () => {
+  try {
+    const payload = {
+      first_name: tempFirstName,
+      last_name: tempLastName,
+      email: tempEmail,
+      gender: tempGender,
+      dob: tempDob, // must be yyyy-mm-dd
+    };
+
+    const res = await editProfileApi(payload);
+
+    if (!res?.status) {
+      alert("Failed to update profile");
+      return;
+    }
+
+    // Update UI state
+    setFirstName(tempFirstName);
+    setLastName(tempLastName);
     setEmail(tempEmail);
+    setGender(tempGender);
+    setDob(tempDob);
+
+    setProfile((prev) => ({
+      ...prev,
+      first_name: tempFirstName,
+      last_name: tempLastName,
+      email: tempEmail,
+      gender: tempGender,
+      dob: tempDob,
+    }));
+
     setEditing(false);
-    localStorage.setItem("userName", tempName);
-    localStorage.setItem("userEmail", tempEmail);
-  };
+    alert("Profile updated successfully ✅");
+
+  } catch (err) {
+    console.error("Edit profile error", err);
+    alert("Something went wrong");
+  }
+};
 
   // other quick actions
   const handleQuickAction = (path) => navigate(path);
   const handleSettings = () => navigate("/settings");
-  const handleLogout = () => {
-    // keep orders etc but clear auth
-    localStorage.removeItem("authToken");
-    navigate("/");
-  };
+  
+const handleLogout = () => {
+  logout(); // ✅ clears accessToken, refreshToken, user, isLoggedIn
+};
+
 
   if (loadingProfile) {
   return (
@@ -407,6 +513,7 @@ export default function ProfilePage() {
     </div>
   );
 }
+
 
 
   return (
@@ -432,11 +539,15 @@ export default function ProfilePage() {
         <div className="bg-white rounded-2xl shadow-md p-6 flex flex-col items-center text-center relative">
           <div className="relative w-24 h-24 mb-4">
            {profile?.profile_photo || profileImage ? (
-            <img
-              src={profile?.profile_photo || profileImage}
-              className="w-24 h-24 rounded-full object-cover"
-              alt="Profile"
-            />
+           <img
+          src={
+            profileImage
+              ? profileImage
+              : getFullImageUrl(profile?.profile_photo)
+          }
+          className="w-24 h-24 rounded-full object-cover"
+          alt="Profile"
+        />
           ) : (
               <div className="w-24 h-24 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center">
                 <User size={50} />
@@ -454,12 +565,20 @@ export default function ProfilePage() {
           {editing ? (
             <div className="w-full space-y-2 mb-4">
               <input
-                type="text"
-                value={tempName}
-                onChange={(e) => setTempName(e.target.value)}
-                className="w-full border border-orange-300 rounded-xl px-3 py-2"
-                placeholder="Enter Name"
-              />
+            type="text"
+            value={tempFirstName}
+            onChange={(e) => setTempFirstName(e.target.value)}
+            className="w-full border border-orange-300 rounded-xl px-3 py-2"
+            placeholder="First Name"
+          />
+
+          <input
+            type="text"
+            value={tempLastName}
+            onChange={(e) => setTempLastName(e.target.value)}
+            className="w-full border border-orange-300 rounded-xl px-3 py-2"
+            placeholder="Last Name"
+/>
               <input
                 type="email"
                 value={tempEmail}
@@ -468,11 +587,27 @@ export default function ProfilePage() {
                 placeholder="Enter Email"
               />
               <input type="text" value={phone} disabled className="w-full border bg-gray-100 rounded-xl px-3 py-2 cursor-not-allowed" />
+            <select
+            value={tempGender}
+            onChange={(e) => setTempGender(e.target.value)}
+            className="w-full border border-orange-300 rounded-xl px-3 py-2"
+          >
+            <option value="">Select Gender</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
+              <input
+            type="date"
+            value={tempDob}
+            onChange={(e) => setTempDob(e.target.value)}
+            className="w-full border border-orange-300 rounded-xl px-3 py-2"
+          />        
             </div>
           ) : (
             <>
              <h2 className="text-xl font-semibold">
-              {profile?.full_name || "Your Name"}
+              {profile?.first_name} {profile?.last_name}
             </h2>
             <p className="text-gray-500 text-sm">
               {profile?.email || "No email added"}
@@ -506,18 +641,18 @@ export default function ProfilePage() {
 
         {/* Quick Actions */}
         <div className="mt-6 grid grid-cols-2 gap-4">
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleQuickAction("/dailylogin")} className="flex items-center justify-center gap-2 bg-white px-4 py-2 rounded-xl shadow hover:bg-orange-50 w-full">
+          {/* <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleQuickAction("/dailylogin")} className="flex items-center justify-center gap-2 bg-white px-4 py-2 rounded-xl shadow hover:bg-orange-50 w-full">
             🎯 Daily Login
-          </motion.button>
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleQuickAction("/spinandwin")} className="flex items-center justify-center gap-2 bg-white px-4 py-2 rounded-xl shadow hover:bg-orange-50 w-full">
+          </motion.button> */}
+          <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleQuickAction("/spinandwin")} className="flex items-center justify-center gap-2 bg-white px-4 py-2 rounded-xl shadow hover:bg-orange-100 w-full">
             🎡 Spin & Win
           </motion.button>
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleQuickAction("/referafriend")} className="flex items-center justify-center gap-2 bg-white px-4 py-2 rounded-xl shadow hover:bg-orange-50 w-full">
+          <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleQuickAction("/referafriend")} className="flex items-center justify-center gap-2 bg-white px-4 py-2 rounded-xl shadow hover:bg-orange-100 w-full">
             🤝 Refer a Friend
           </motion.button>
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleQuickAction("/rewards")} className="flex items-center justify-center gap-2 bg-white px-4 py-2 rounded-xl shadow hover:bg-orange-50 w-full">
+          {/* <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleQuickAction("/rewards")} className="flex items-center justify-center gap-2 bg-white px-4 py-2 rounded-xl shadow hover:bg-orange-50 w-full">
             🎁 Rewards
-          </motion.button>
+          </motion.button> */}
         </div>
 
         {/* Recent Orders */}
@@ -676,9 +811,19 @@ export default function ProfilePage() {
             <LogOut className="text-orange-500" /> Logout
           </motion.button>
 
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => { /* show delete modal kept earlier if desired */ alert("Use account delete in settings (demo)"); }} className="flex items-center gap-3 bg-white px-5 py-3 rounded-xl shadow hover:bg-red-50 text-red-500 w-full">
-            <Shield className="text-red-500" /> Delete Account
-          </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setShowDeleteModal(true)}
+          disabled={deleteLoading}
+          className="flex items-center gap-3 bg-white px-5 py-3 rounded-xl shadow hover:bg-red-50 text-red-500 w-full"
+        >
+          <Shield className="text-red-500" />
+          {deleteLoading ? "Deleting..." : "Delete Account"}
+        </motion.button>
+
+        {deleteError && (
+          <p className="text-red-500 text-xs mt-2">{deleteError}</p>
+        )}
         </div>
       </motion.div>
 
@@ -908,6 +1053,76 @@ export default function ProfilePage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ========== DELETE ACCOUNT CONFIRM MODAL ========== */}
+<AnimatePresence>
+  {showDeleteModal && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+    >
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6"
+      >
+        <h2 className="text-xl font-bold text-red-600 mb-3 text-center">
+          ⚠️ Delete Account
+        </h2>
+
+        <p className="text-sm text-gray-600 text-center mb-4">
+          This action is permanent and cannot be undone.
+          <br />
+          To confirm, type <b>DELETE</b> below.
+        </p>
+
+        <input
+          type="text"
+          value={confirmText}
+          onChange={(e) => setConfirmText(e.target.value)}
+          placeholder="Type DELETE to confirm"
+          className="w-full border border-red-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-400"
+        />
+
+        {deleteError && (
+          <p className="text-red-500 text-xs mt-2">{deleteError}</p>
+        )}
+
+        <div className="flex gap-3 mt-5">
+          <button
+            onClick={() => {
+              setShowDeleteModal(false);
+              setConfirmText("");
+              setDeleteError(null);
+            }}
+            className="w-1/2 py-2 bg-gray-100 rounded-xl hover:bg-gray-200 font-semibold"
+          >
+            Cancel
+          </button>
+
+          <button
+            disabled={confirmText !== "DELETE" || deleteLoading}
+            onClick={async () => {
+              await handleDeleteAccount();
+            }}
+            className={`w-1/2 py-2 rounded-xl font-semibold text-white transition ${
+              confirmText === "DELETE"
+                ? "bg-red-600 hover:bg-red-700"
+                : "bg-red-300 cursor-not-allowed"
+            }`}
+          >
+            {deleteLoading ? "Deleting..." : "Delete"}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
+
     </div>
   );
 }

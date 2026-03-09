@@ -2,8 +2,9 @@
 
 export const saveAuthData = ({ access, refresh, user }) => {
   localStorage.setItem("accessToken", access);
-  localStorage.setItem("refreshToken", refresh);
-  localStorage.setItem("user", JSON.stringify(user));
+  if (refresh) localStorage.setItem("refreshToken", refresh);
+  if (user) localStorage.setItem("user", JSON.stringify(user));
+  localStorage.setItem("isLoggedIn", "true");
 };
 
 export const getAccessToken = () =>
@@ -15,6 +16,12 @@ export const getUser = () => {
 };
 
 export const logout = () => {
-  localStorage.clear();
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("user");
+  localStorage.removeItem("isLoggedIn");
   window.location.href = "/";
 };
+
+export const isAuthenticated = () =>
+  !!localStorage.getItem("accessToken");
